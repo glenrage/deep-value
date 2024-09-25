@@ -1,14 +1,9 @@
 const stockService = require('../services/stockService');
+const { NVDA_MOCK } = require('../mocks');
 
 exports.getMockStockData = (req, res) => {
   const data = stockService.getMockStockData();
   res.json(data);
-};
-
-exports.calculateDCF = (req, res) => {
-  const { revenue, expenses, growthRate } = req.body;
-  const dcfResult = stockService.calculateDCF(revenue, expenses, growthRate);
-  res.json(dcfResult);
 };
 
 exports.getStockData = async (req, res) => {
@@ -20,3 +15,32 @@ exports.getStockData = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.calculateDCF = (req, res) => {
+  // console.log({ NVDA_MOCK });
+
+  const dcfInputs = stockService.prepareDCFInputs(NVDA_MOCK);
+
+  const {
+    freeCashFlow,
+    growthRate,
+    discountRate,
+    terminalGrowthRate,
+    sharesOutstanding,
+  } = dcfInputs;
+
+  const dcfResult = stockService.calculateDCF(
+    freeCashFlow,
+    growthRate,
+    discountRate,
+    terminalGrowthRate,
+    sharesOutstanding
+  );
+
+  console.log({ dcfInputs, dcfResult });
+  res.json({
+    value: dcfResult,
+  });
+};
+
+exports.calculateReverseDCF = (req, res) => {};
