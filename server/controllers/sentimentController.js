@@ -34,6 +34,13 @@ const requestSentimentExplanation = async (req, res) => {
       500 // Limit the text to 500 characters (adjustable)
     );
 
+    // Await the result from the async service function
+    const sentimentAnalysisResult = await sentimentService.getSentimentAnalysis(
+      {
+        text: textForAnalysis,
+      }
+    );
+
     // Send each article to Pinecone as embeddings
     for (const article of formattedNews) {
       if (article.content) {
@@ -51,13 +58,6 @@ const requestSentimentExplanation = async (req, res) => {
         });
       }
     }
-
-    // Await the result from the async service function
-    const sentimentAnalysisResult = await sentimentService.getSentimentAnalysis(
-      {
-        text: textForAnalysis,
-      }
-    );
 
     res.json({ sentimentAnalysisResult });
   } catch (error) {
