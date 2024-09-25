@@ -1,7 +1,4 @@
 const { Pinecone } = require('@pinecone-database/pinecone');
-// const { pipeline } = require('@huggingface/transformers');
-// const { pipeline } = require('@xenova/transformers');
-// import { pipeline } from '@xenova/transformers';
 
 const path = require('path');
 const fs = require('fs');
