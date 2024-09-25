@@ -1,16 +1,7 @@
 const { Pinecone } = require('@pinecone-database/pinecone');
+const { ChatOpenAI } = require('@langchain/openai');
 
-const path = require('path');
-const fs = require('fs');
-
-// Set cache directory to a writable location
-const cacheDir = path.join(__dirname, '.cache', 'huggingface');
-process.env.HF_HOME = cacheDir;
-
-// Ensure cache directory exists
-if (!fs.existsSync(cacheDir)) {
-  fs.mkdirSync(cacheDir, { recursive: true });
-}
+const model = new ChatOpenAI({ model: 'gpt-3.5-turbo-0125' });
 
 const indexName = 'quickstart';
 
@@ -87,6 +78,18 @@ const storeEmbedding = async (embedding, metadata) => {
 
     const sentimentString = JSON.stringify(metadata.sentiment);
     const sanitizedId = sanitizeId(metadata.title);
+
+    const existingEmbedding = await index.fetch([sanitizedId]);
+
+    if (
+      existingEmbedding &&
+      Object.keys(existingEmbedding.records).length > 0
+    ) {
+      console.log(
+        `Embedding for ${metadata.title} already exists in Pinecone. Skipping insertion.`
+      );
+      return;
+    }
 
     await index.upsert([
       {
