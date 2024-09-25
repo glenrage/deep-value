@@ -8,7 +8,9 @@ const requestAIExplanation = async (req, res) => {
     const data = await aiService.getAIExplanation(num);
 
     // Return the AI-generated explanation in the response
-    res.json({ explanation: data });
+    res.json({
+      explanation: data,
+    });
   } catch (error) {
     // Handle any errors that occur during the request
     console.error('Error fetching AI explanation:', error);
