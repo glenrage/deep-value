@@ -3,6 +3,25 @@ const { NVDA_MOCK } = require('../mocks');
 const yahooFinance = require('yahoo-finance2').default;
 
 const alphaVantageApiKey = process.env.ALPHAVANTAGE_API_KEY;
+const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
+
+const getInsiderSentiment = async (ticker) => {
+  try {
+    const url = `https://finnhub.io/api/v1/stock/insider-sentiment`;
+
+    const response = await axios.get(url, {
+      params: {
+        symbol: ticker,
+        token: FINNHUB_API_KEY,
+      },
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching insider trades for ticker: ${ticker}`, error);
+    throw new Error('Failed to fetch recent insider trades data');
+  }
+};
 
 const getMockStockData = () => {
   return NVDA_MOCK;
@@ -46,6 +65,8 @@ const getStockData = async (ticker) => {
 
     const incomeStatement = incomeStatementResponse.data;
     const cashFlow = cashFlowResponse.data;
+
+    console.log({ incomeStatement, cashFlow });
 
     // Extract necessary data (assuming annual reports)
     const annualIncome = incomeStatement.annualReports[0];
@@ -265,4 +286,5 @@ module.exports = {
   getMockStockData,
   getStockData,
   getAdditionalStockData,
+  getInsiderSentiment,
 };

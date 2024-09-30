@@ -31,51 +31,51 @@ const getAIExplanation = async (dcfResult, stockData) => {
 `;
 
   try {
-    // const response = await openai.chat.completions.create({
-    //   model: 'gpt-3.5-turbo',
-    //   messages: [
-    //     {
-    //       role: 'system',
-    //       content:
-    //         'You are a financial expert providing insights on stock valuation.',
-    //     },
-    //     {
-    //       role: 'user',
-    //       content: messageContent,
-    //     },
-    //   ],
-    // });
-
-    const response = {
-      explanation:
-        'A DCF result of 157 indicates that the present value of the future cash flows of the stock or investment being analyzed is $157. This value is based on the estimated cash flows the investment is expected to generate in the future, discounted back to the present value using a discount rate. In simple terms, it suggests that the investment is currently valued at $157 based on its expected future cash flows.',
-      id: 'chatcmpl-ABPtEL8wHHxXlN1KXyJIbrLHjgZyS',
-      object: 'chat.completion',
-      created: 1727284492,
-      model: 'gpt-3.5-turbo-0125',
-      choices: [
+    const response = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [
         {
-          index: 0,
-          message: {
-            role: 'assistant',
-            content:
-              "Based on the Discounted Cash Flow (DCF) Analysis provided, we can see that the intrinsic values for the stock in the Best Case, Average Case, and Worst Case scenarios are $117.76, $72.41, and $43.00 respectively. The current market price of the stock is $121.40.\n\nFrom the Key Financial Metrics, we can observe that the market capitalization is $2.98 trillion, the Beta is 1.673, the Forward PE ratio is 30.21, and the P/S ratio is 30.93. The PEG ratio is 0.81, indicating that the stock may be undervalued based on its growth prospects.\n\nThe Scenario Assumptions provide insights into the impact of changes in growth rates, discount rates, and terminal growth rates on the stock's valuation. In the Best Case scenario, with improved growth prospects and lower discount rates, the intrinsic value of the stock increases. Conversely, in the Worst Case scenario, where growth prospects deteriorate and discount rates increase, the intrinsic value decreases.\n\nGiven the current market conditions and the provided scenarios, it appears that the stock may be slightly overvalued based on the Best Case intrinsic value compared to the current market price. However, in the Average and Worst Case scenarios, the stock seems to be valued closer to its intrinsic value or even slightly undervalued.\n\nOverall, investors should consider the different scenarios and market conditions when evaluating the stock's valuation and make informed decisions based on their risk tolerance and investment objectives.",
-            refusal: null,
-          },
-          logprobs: null,
-          finish_reason: 'stop',
+          role: 'system',
+          content:
+            'You are a financial expert providing insights on stock valuation.',
+        },
+        {
+          role: 'user',
+          content: messageContent,
         },
       ],
-      usage: {
-        prompt_tokens: 35,
-        completion_tokens: 81,
-        total_tokens: 116,
-        completion_tokens_details: {
-          reasoning_tokens: 0,
-        },
-      },
-      system_fingerprint: null,
-    };
+    });
+
+    // const response = {
+    //   explanation:
+    //     'A DCF result of 157 indicates that the present value of the future cash flows of the stock or investment being analyzed is $157. This value is based on the estimated cash flows the investment is expected to generate in the future, discounted back to the present value using a discount rate. In simple terms, it suggests that the investment is currently valued at $157 based on its expected future cash flows.',
+    //   id: 'chatcmpl-ABPtEL8wHHxXlN1KXyJIbrLHjgZyS',
+    //   object: 'chat.completion',
+    //   created: 1727284492,
+    //   model: 'gpt-3.5-turbo-0125',
+    //   choices: [
+    //     {
+    //       index: 0,
+    //       message: {
+    //         role: 'assistant',
+    //         content:
+    //           "Based on the Discounted Cash Flow (DCF) Analysis provided, we can see that the intrinsic values for the stock in the Best Case, Average Case, and Worst Case scenarios are $117.76, $72.41, and $43.00 respectively. The current market price of the stock is $121.40.\n\nFrom the Key Financial Metrics, we can observe that the market capitalization is $2.98 trillion, the Beta is 1.673, the Forward PE ratio is 30.21, and the P/S ratio is 30.93. The PEG ratio is 0.81, indicating that the stock may be undervalued based on its growth prospects.\n\nThe Scenario Assumptions provide insights into the impact of changes in growth rates, discount rates, and terminal growth rates on the stock's valuation. In the Best Case scenario, with improved growth prospects and lower discount rates, the intrinsic value of the stock increases. Conversely, in the Worst Case scenario, where growth prospects deteriorate and discount rates increase, the intrinsic value decreases.\n\nGiven the current market conditions and the provided scenarios, it appears that the stock may be slightly overvalued based on the Best Case intrinsic value compared to the current market price. However, in the Average and Worst Case scenarios, the stock seems to be valued closer to its intrinsic value or even slightly undervalued.\n\nOverall, investors should consider the different scenarios and market conditions when evaluating the stock's valuation and make informed decisions based on their risk tolerance and investment objectives.",
+    //         refusal: null,
+    //       },
+    //       logprobs: null,
+    //       finish_reason: 'stop',
+    //     },
+    //   ],
+    //   usage: {
+    //     prompt_tokens: 35,
+    //     completion_tokens: 81,
+    //     total_tokens: 116,
+    //     completion_tokens_details: {
+    //       reasoning_tokens: 0,
+    //     },
+    //   },
+    //   system_fingerprint: null,
+    // };
 
     console.dir(response, { depth: null });
 
