@@ -28,6 +28,10 @@ const stockDataPrompt = PromptTemplate.fromTemplate(
 const dcfCalculationPrompt = PromptTemplate.fromTemplate(
   `Calculate the DCF value using the provided stock data: {stockData} and additional data: {additionalData}.`
 );
+const insiderSentimentPrompt = PromptTemplate.fromTemplate(
+  `The insider sentiment for the stock ticker {ticker} is given below: {insiderSentiment}. 
+  Based on this data, analyze whether the insider sentiment is positive or negative, and discuss how it might affect the stock's future performance.`
+);
 const aiExplanationPrompt = PromptTemplate.fromTemplate(
   `Provide an AI explanation of the DCF result: {dcfResult} with additional stock information: {additionalData}.`
 );
@@ -66,10 +70,12 @@ const stockAnalysisPipeline = async (ticker) => {
   let dcfResult;
   let aiExplanation;
   let sentimentResults;
+  let insiderSentiment;
   try {
     // Step 1: Get Stock Data
     try {
       additionalData = await stockService.getAdditionalStockData(ticker);
+      insiderSentiment = await stockService.getInsiderSentiment(ticker);
     } catch (error) {
       console.error(
         `Error fetching additional stock data for ticker: ${ticker}`,
@@ -167,6 +173,26 @@ const stockAnalysisPipeline = async (ticker) => {
       throw new Error('Failed to perform sentiment analysis');
     }
 
+    // Step 5: Analyze Insider Sentiment
+    try {
+      const formattedInsiderSentiment = JSON.stringify(insiderSentiment);
+      const formattedPrompt = await insiderSentimentPrompt.format({
+        ticker,
+        insiderSentiment: formattedInsiderSentiment,
+      });
+
+      const insiderSentimentResult = await model.call([
+        new HumanMessage(formattedPrompt),
+      ]);
+      insiderSentiment = insiderSentimentResult.content;
+    } catch (error) {
+      console.error(
+        `Error analyzing insider sentiment for ticker: ${ticker}`,
+        error
+      );
+      throw new Error('Failed to analyze insider sentiment');
+    }
+
     // Execute composed prompt with formatted data
     try {
       const formattedPrompt = await composedPrompt.format({
@@ -176,12 +202,14 @@ const stockAnalysisPipeline = async (ticker) => {
         additionalData: JSON.stringify(additionalData),
         formattedNews: JSON.stringify(sentimentResults),
         aiExplanation,
+        insiderSentiment,
       });
 
       return {
         dcfAnalysis: dcfResult,
         aiExplanation,
         sentimentAnalysis: sentimentResults,
+        insiderSentiment,
         formattedPrompt,
       };
     } catch (error) {
