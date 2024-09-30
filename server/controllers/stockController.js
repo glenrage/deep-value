@@ -16,10 +16,13 @@ exports.getStockData = async (req, res) => {
   }
 };
 
-exports.calculateDCF = (req, res) => {
-  // console.log({ NVDA_MOCK });
+exports.calculateDCF = async (req, res) => {
+  const { ticker } = req.query;
 
-  const dcfInputs = stockService.prepareDCFInputs(NVDA_MOCK);
+  // const stockData = await stockService.getStockData(ticker);
+  const additionalData = await stockService.getAdditionalStockData(ticker);
+
+  const dcfInputs = stockService.prepareDCFInputs(NVDA_MOCK, additionalData);
 
   const {
     freeCashFlow,
@@ -29,7 +32,7 @@ exports.calculateDCF = (req, res) => {
     sharesOutstanding,
   } = dcfInputs;
 
-  const dcfResult = stockService.calculateDCF(
+  const dcfResult = stockService.calculateDCFAllScenarios(
     freeCashFlow,
     growthRate,
     discountRate,
@@ -37,9 +40,10 @@ exports.calculateDCF = (req, res) => {
     sharesOutstanding
   );
 
-  console.log({ dcfInputs, dcfResult });
   res.json({
     value: dcfResult,
+    dcfInputs,
+    dcfResult,
   });
 };
 

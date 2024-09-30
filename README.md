@@ -1,63 +1,74 @@
 # Deep Value
 
-## User Interface (UI):
+## Overview
 
-- **Input**: Stock tickers, financial data (revenue, expenses, growth rates, etc.).
-- **Output**: DCF model results, AI explanations, sentiment insights, and charts.
-- **Technology**: React.js or Vue.js for the front-end, Chart.js/D3.js for visualizations.
+**Deep Value** is a full-stack application that calculates a stock's intrinsic value using a custom Discounted Cash Flow (DCF) model, enhanced with AI-driven predictions, sentiment analysis, and scenario analysis. It provides real-time data visualization, AI-generated stock insights, and semantic search for financial analysis.
 
-## API Gateway:
+## Features Overview
 
-- **Function**: Acts as the central hub for communication between the front-end, AI services, stock data APIs, and the back-end.
-- **Technology**: Node.js/Express or GraphQL for API routing.
+1. **User Interface (UI)**
 
-## Stock Data API:
+   - Input stock tickers and financial data (e.g., revenue, growth rates).
+   - Displays DCF model results, AI explanations, sentiment insights, and visualizations.
+   - **Tech**: React.js/Vue.js, Chart.js/D3.js.
 
-- **Function**: Retrieves financial data for the selected stock ticker.
-- **Example APIs**: Alpha Vantage, Yahoo Finance.
-- **Response**: Company financials, stock price history, key metrics.
-- **Technology**: RESTful API integration in the back-end.
+2. **API Gateway**
 
-## Custom DCF Model Service (AI-Enhanced):
+   - Central hub for communication between front-end, back-end, AI services, and stock data APIs.
+   - **Tech**: Node.js/Express or GraphQL.
 
-- **Function**: Receives financial input (e.g., revenue, growth rate) and calculates the stock's intrinsic value using a DCF formula enhanced by AI predictions.
-- **Process**:
-  - Pulls data from the stock data API.
-  - **AI Prediction**: AI models predict key inputs like revenue growth, operating margins, and discount rates based on historical performance, industry trends, and macroeconomic data.
-  - **Dynamic Scenario Analysis**: Uses AI to run multiple scenario analyses and sensitivity tests (e.g., Monte Carlo simulations) on DCF inputs.
-  - **Sentiment-Driven Adjustments**: Integrates sentiment data into the DCF to adjust growth rates and risk based on market perception.
-  - Runs the DCF calculation with dynamic inputs.
-  - **AI Feedback Loop**: Continuously refines inputs using reinforcement learning models to improve the accuracy of the valuation.
-- **Technology**: Python/Node.js microservice for DCF calculations, machine learning models (scikit-learn, TensorFlow) for AI predictions.
+3. **Stock Data API**
 
-## AI Service (ChatGPT API):
+   - Retrieves financial data for the selected stock ticker.
+   - **Example APIs**: Alpha Vantage, Yahoo Finance.
+   - **Tech**: RESTful API integration.
 
-- **Function**: Generates explanations and recommendations based on DCF results.
-- **Features**:
-  - Provides natural language explanations for DCF model results.
-  - Generates stock recommendations based on financial trends and AI-analyzed market conditions.
-  - Adjusts stock valuation forecasts based on market sentiment or DCF results.
-- **Technology**: OpenAI’s GPT API integration.
+4. **Custom DCF Model Service (AI-Enhanced)**
 
-## Sentiment Analysis Module:
+   - Calculates intrinsic stock value using AI-predicted inputs like growth rates and margins.
+   - Runs scenario analysis and sensitivity tests (e.g., Monte Carlo simulations).
+   - Incorporates sentiment-driven adjustments.
+   - **Tech**: Python/Node.js for DCF calculations, scikit-learn/TensorFlow for AI predictions.
 
-- **Function**: Scrapes news articles, social media, and earnings calls to assess public sentiment around the stock.
-- **Integration**: Sentiment data is factored into the DCF model by adjusting growth rates and discount rates based on positive or negative sentiment.
-- **Technology**: Python/NLP libraries for sentiment analysis (e.g., Hugging Face), APIs like Twitter, Google News, or web scraping for data collection.
+5. **AI Service (ChatGPT API)**
 
-## Embeddings and Vector Database:
+   - Provides natural language explanations and stock recommendations.
+   - Adjusts forecasts based on market sentiment.
+   - **Tech**: OpenAI’s GPT API integration.
 
-- **Function**: Stores and retrieves historical stock data, past market trends, and earnings calls.
-- **Embeddings**: Converts textual data (e.g., earnings call transcripts) into vector representations for similarity searches.
-- **Vector Database**: Stores these embeddings and enables semantic search to identify similar market patterns or performances.
-- **Technology**: Pinecone or FAISS for vector search, Elasticsearch for full-text search.
+6. **Sentiment Analysis Module**
 
-## Data Storage:
+   - Scrapes news, social media, and earnings calls to assess stock sentiment.
+   - Integrates sentiment data into the DCF model for growth rate adjustments.
+   - **Tech**: Python/NLP libraries (e.g., Hugging Face), web scraping APIs.
 
-- **Function**: Stores user-generated input (e.g., revenue, expenses, DCF results), stock financials, and AI-generated insights.
-- **Technology**: PostgreSQL or MongoDB for structured financial data storage, AWS S3 for large datasets (e.g., historical trends).
+7. **Embeddings and Vector Database**
 
-## Visualization Component:
+   - Converts textual data (e.g., earnings calls) into vector representations for similarity searches.
+   - Stores embeddings for semantic search to identify market trends or patterns.
+   - **Tech**: Pinecone/FAISS, Elasticsearch.
 
-- **Function**: Visualizes the DCF model's output, AI recommendations, and historical stock performance.
-- **Technology**: Front-end libraries like Chart.js or D3.js for creating charts and interactive data visualizations.
+8. **Data Storage**
+
+   - Stores user input, stock financials, and AI-generated insights.
+   - **Tech**: PostgreSQL/MongoDB for structured data, AWS S3 for large datasets.
+
+9. **Visualization Component**
+
+   - Visualizes DCF model output, AI recommendations, and stock performance.
+   - **Tech**: Chart.js/D3.js for interactive visualizations.
+
+10. **LangChain Integration**
+    - **Dynamic Workflow**: Uses LangChain to connect AI models, stock APIs, and back-end systems for comprehensive analysis.
+    - **Complex Query Management**: Chains multiple API calls and AI predictions.
+    - **Automated Agents**: Creates autonomous agents that analyze sentiment and deliver stock recommendations.
+    - **Embeddings Search**: Uses LangChain for semantic search across financial reports.
+    - **Tech**: LangChain.js and LangChain Python.
+
+## Installation
+
+1. Clone the repository.
+2. Install dependencies:
+   ```bash
+   npm install
+   ```

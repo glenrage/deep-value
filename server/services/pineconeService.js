@@ -1,7 +1,4 @@
 const { Pinecone } = require('@pinecone-database/pinecone');
-const { ChatOpenAI } = require('@langchain/openai');
-
-const model = new ChatOpenAI({ model: 'gpt-3.5-turbo-0125' });
 
 const indexName = 'quickstart';
 
