@@ -19,14 +19,12 @@
 
 3. **Stock Data API**
 
-   - Retrieves financial data for the selected stock ticker.
-   - **Example APIs**: Alpha Vantage, Yahoo Finance.
-   - **Tech**: RESTful API integration.
+   - Retrieves financial data for the selected stock ticker, & recent insider transactions
+   - **Example APIs**: Alpha Vantage, Yahoo Finance, FinnHub
 
 4. **Custom DCF Model Service (AI-Enhanced)**
 
    - Calculates intrinsic stock value using AI-predicted inputs like growth rates and margins.
-   - Runs scenario analysis and sensitivity tests (e.g., Monte Carlo simulations).
    - Incorporates sentiment-driven adjustments.
    - **Tech**: Python/Node.js for DCF calculations, scikit-learn/TensorFlow for AI predictions.
 
@@ -40,6 +38,7 @@
 
    - Scrapes news, social media, and earnings calls to assess stock sentiment.
    - Integrates sentiment data into the DCF model for growth rate adjustments.
+   - Integrates recent insider trades data for analysis on insider trends
    - **Tech**: Python/NLP libraries (e.g., Hugging Face), web scraping APIs.
 
 7. **Embeddings and Vector Database**
