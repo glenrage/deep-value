@@ -1,14 +1,15 @@
 const axios = require('axios');
-const { NVDA_MOCK } = require('../mocks');
 const yahooFinance = require('yahoo-finance2').default;
-
-const alphaVantageApiKey = process.env.ALPHAVANTAGE_API_KEY;
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
+
+const {
+  extractFinnhubReports,
+  calculateTerminalGrowthRate,
+} = require('../utils/helpers');
 
 const getInsiderSentiment = async (ticker) => {
   try {
     const url = `https://finnhub.io/api/v1/stock/insider-sentiment`;
-
     const response = await axios.get(url, {
       params: {
         symbol: ticker,
@@ -21,10 +22,6 @@ const getInsiderSentiment = async (ticker) => {
     console.error(`Error fetching insider trades for ticker: ${ticker}`, error);
     throw new Error('Failed to fetch recent insider trades data');
   }
-};
-
-const getMockStockData = () => {
-  return NVDA_MOCK;
 };
 
 // Fetch additional data
@@ -49,50 +46,104 @@ const getAdditionalStockData = async (ticker) => {
       keyStats: quoteSummary,
     };
   } catch (error) {
-    console.error('Error fetching additional stock data:', error);
+    console.error('Error fetching Yahoo stock data:', error);
     throw new Error('Unable to fetch additional stock data');
   }
 };
 
 const getStockData = async (ticker) => {
   try {
-    // Fetch income statement
-    const incomeStatementUrl = `https://www.alphavantage.co/query?function=INCOME_STATEMENT&symbol=${ticker}&apikey=${alphaVantageApiKey}`;
-    const cashFlowUrl = `https://www.alphavantage.co/query?function=CASH_FLOW&symbol=${ticker}&apikey=${alphaVantageApiKey}`;
+    // Fetch financials report (income statement and cash flow) with annual frequency
+    const financialsUrl = `https://finnhub.io/api/v1/stock/financials-reported`;
+    const financialsResponse = await axios.get(financialsUrl, {
+      params: {
+        symbol: ticker,
+        token: FINNHUB_API_KEY,
+        freq: 'annual',
+      },
+    });
 
-    const incomeStatementResponse = await axios.get(incomeStatementUrl);
-    const cashFlowResponse = await axios.get(cashFlowUrl);
+    const financialsData = financialsResponse.data.data;
+    if (!financialsData || financialsData.length === 0) {
+      throw new Error('No financial data available');
+    }
 
-    const incomeStatement = incomeStatementResponse.data;
-    const cashFlow = cashFlowResponse.data;
+    // Extract annual financial reports
+    const annualReports = financialsData.filter(
+      (report) => report.form === '10-K'
+    );
+    if (annualReports.length < 2) {
+      throw new Error('Insufficient financial data for multiple years');
+    }
 
-    console.log({ incomeStatement, cashFlow });
+    // Extract income statement and cash flow for the two most recent years
 
-    // Extract necessary data (assuming annual reports)
-    const annualIncome = incomeStatement.annualReports[0];
-    const annualCashFlow = cashFlow.annualReports[0];
+    const mostRecentReport = extractFinnhubReports(annualReports[0]);
+    const previousReport = extractFinnhubReports(annualReports[1]);
 
-    const revenue = parseFloat(annualIncome.totalRevenue); // Revenue
-    const operatingIncome = parseFloat(annualIncome.operatingIncome); // Operating Income
+    // Check if any critical data is missing
+    if (!mostRecentReport || !previousReport) {
+      throw new Error('Critical financial data is missing');
+    }
+
+    // Calculate free cash flow (FCF) for both years
     const freeCashFlow =
-      parseFloat(annualCashFlow.operatingCashflow) -
-      parseFloat(annualCashFlow.capitalExpenditures); // FCF
+      mostRecentReport.netCashProvidedByOperatingActivities &&
+      mostRecentReport.capitalExpenditures
+        ? mostRecentReport.netCashProvidedByOperatingActivities -
+          mostRecentReport.capitalExpenditures
+        : null;
+
+    if (freeCashFlow === null) {
+      console.warn('Free Cash Flow data is missing, using default value of 0');
+    }
+
+    const formattedIncomeStatement = {
+      annualReports: [
+        {
+          totalRevenue: mostRecentReport.revenue ?? 0,
+          operatingIncome: mostRecentReport.operatingIncome ?? 0,
+          incomeBeforeTax: mostRecentReport.incomeBeforeTax ?? 0,
+          interestExpense: mostRecentReport.interestExpense ?? 0,
+          incomeTaxExpense: mostRecentReport.incomeTaxExpense ?? 0,
+        },
+        {
+          totalRevenue: previousReport.revenue ?? 0,
+          operatingIncome: previousReport.operatingIncome ?? 0,
+          incomeBeforeTax: previousReport.incomeBeforeTax ?? 0,
+          interestExpense: previousReport.interestExpense ?? 0,
+          incomeTaxExpense: previousReport.incomeTaxExpense ?? 0,
+        },
+      ],
+    };
+
+    const formattedCashFlowStatement = {
+      annualReports: [
+        {
+          operatingCashflow:
+            mostRecentReport.netCashProvidedByOperatingActivities ?? 0,
+          capitalExpenditures: mostRecentReport.capitalExpenditures ?? 0,
+        },
+        {
+          operatingCashflow:
+            previousReport.netCashProvidedByOperatingActivities ?? 0,
+          capitalExpenditures: previousReport.capitalExpenditures ?? 0,
+        },
+      ],
+    };
 
     return {
       data: {
-        incomeStatement,
-        cashFlow,
+        incomeStatement: formattedIncomeStatement,
+        cashFlow: formattedCashFlowStatement,
       },
       ticker,
-      revenue,
-      operatingIncome,
-      freeCashFlow,
+      revenue: mostRecentReport.revenue ?? 0,
+      operatingIncome: mostRecentReport.operatingIncome ?? 0,
+      freeCashFlow: freeCashFlow ?? 0,
     };
   } catch (error) {
-    console.error(
-      'Error fetching stock data from Alpha Vantage:',
-      error.message
-    );
+    console.error('Error fetching stock data from Finnhub:', error.message);
     throw new Error('Unable to fetch stock data');
   }
 };
@@ -198,6 +249,7 @@ const prepareDCFInputs = (data, additionalData) => {
 
   // Estimate growth rate (revenue growth) from most recent annual report and previous year's data
   const previousAnnualReport = data.data.incomeStatement.annualReports[1]; // Previous year's report
+
   const currentRevenue = parseFloat(annualReport.totalRevenue);
   const previousRevenue = parseFloat(previousAnnualReport.totalRevenue);
   const growthRate =
@@ -228,37 +280,63 @@ const prepareDCFInputs = (data, additionalData) => {
  * We use CAPM for cost of equity and calculate cost of debt from the interest expense.
  */
 function calculateWACC(data, additionalData) {
-  // Get the most recent annual report (income statement
+  // Get the most recent annual report (income statement)
   const annualReport = data.data.incomeStatement.annualReports[0]; // Most recent annual report
+  console.log('Most Recent Annual Report:', annualReport);
 
-  // Get total debt and equity (Assume equity is total assets - total liabilities if equity not provided)
+  // Extract necessary values with detailed logs for debugging
   const incomeBeforeTax = parseFloat(annualReport.incomeBeforeTax);
-  const assumedInterestRate = 0.05; // Assume a 5% interest rate
-  const totalDebt =
-    parseFloat(annualReport.interestExpense) / assumedInterestRate;
-  const marketCapitalization = additionalData.marketCap;
+  console.log('Income Before Tax:', incomeBeforeTax);
 
-  // Assume cost of equity (Re) calculated from CAPM: Re = Risk-free rate + Beta * (Market return - Risk-free rate)
+  const assumedInterestRate = 0.05; // Assume a 5% interest rate
+  console.log('Assumed Interest Rate:', assumedInterestRate);
+
+  const interestExpense = parseFloat(annualReport.interestExpense);
+  console.log('Interest Expense:', interestExpense);
+
+  const totalDebt = interestExpense / assumedInterestRate;
+  console.log('Total Debt:', totalDebt);
+
+  const marketCapitalization = additionalData.marketCap;
+  console.log('Market Capitalization:', marketCapitalization);
+
+  // Assume cost of equity (Re) calculated from CAPM
   const riskFreeRate = 0.03; // 3% risk-free rate (e.g., US Treasury yield)
+  console.log('Risk-Free Rate:', riskFreeRate);
+
   const beta = additionalData.beta;
+  console.log('Beta:', beta);
+
   const marketReturn = 0.08; // 8% average market return
-  const costOfEquity = riskFreeRate + beta * (marketReturn - riskFreeRate); // CAPM
+  console.log('Market Return:', marketReturn);
+
+  const costOfEquity = riskFreeRate + beta * (marketReturn - riskFreeRate);
+  console.log('Cost of Equity (Re):', costOfEquity);
 
   // Calculate cost of debt: Rd = Interest Expense / Total Debt
-  const costOfDebt = annualReport.interestExpense
-    ? parseFloat(annualReport.interestExpense) / totalDebt
-    : 0; // Avoid division by zero
+  const costOfDebt = interestExpense ? interestExpense / totalDebt : 0; // Avoid division by zero
+  console.log('Cost of Debt (Rd):', costOfDebt);
 
   // Corporate tax rate (income tax / income before tax)
-  const taxRate = parseFloat(annualReport.incomeTaxExpense) / incomeBeforeTax;
+  const incomeTaxExpense = parseFloat(annualReport.incomeTaxExpense);
+  console.log('Income Tax Expense:', incomeTaxExpense);
+
+  const taxRate = incomeBeforeTax ? incomeTaxExpense / incomeBeforeTax : 0; // Avoid division by zero
+  console.log('Corporate Tax Rate:', taxRate);
 
   // Calculate WACC = (E/V) * Re + (D/V) * Rd * (1 - Tc)
   const totalValue = marketCapitalization + totalDebt; // E + D
+  console.log('Total Value (E + D):', totalValue);
+
   const equityWeight = marketCapitalization / totalValue;
+  console.log('Equity Weight (E/V):', equityWeight);
+
   const debtWeight = totalDebt / totalValue;
+  console.log('Debt Weight (D/V):', debtWeight);
 
   const wacc =
     equityWeight * costOfEquity + debtWeight * costOfDebt * (1 - taxRate);
+  console.log('Weighted Average Cost of Capital (WACC):', wacc);
 
   return wacc;
 }
@@ -266,24 +344,10 @@ function calculateWACC(data, additionalData) {
 /**
  * Helper function to calculate the terminal growth rate based on historical revenue growth.
  */
-function calculateTerminalGrowthRate(data) {
-  const annualReports = data.data.incomeStatement.annualReports;
-  const currentRevenue = parseFloat(annualReports[0].totalRevenue);
-  const previousRevenue = parseFloat(annualReports[1].totalRevenue);
-
-  // Calculate the revenue growth rate between two most recent years
-  const revenueGrowthRate =
-    (currentRevenue - previousRevenue) / previousRevenue;
-
-  // Estimate terminal growth rate as a conservative fraction of historical growth
-  const terminalGrowthRate = revenueGrowthRate * 0.5; // Assume the long-term growth is half of the short-term growth
-  return terminalGrowthRate;
-}
 
 module.exports = {
   calculateDCFAllScenarios,
   prepareDCFInputs,
-  getMockStockData,
   getStockData,
   getAdditionalStockData,
   getInsiderSentiment,

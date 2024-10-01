@@ -18,10 +18,6 @@ app.use('/api/stocks', stockRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/sentiment', sentimentRoutes);
 
-// const { pineconeQueue } = require('./services/pineconeService');
-// pineconeQueue.process();
-// console.log('Worker is processing jobs...');
-
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

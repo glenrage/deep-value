@@ -1,66 +1,28 @@
 const { Pinecone } = require('@pinecone-database/pinecone');
+const { Queue } = require('bullmq');
 
 const indexName = 'quickstart';
 
 const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
 
-const initPinecone = async () => {
+// Create a queue for embedding creation
+const embeddingQueue = new Queue('embeddingQueue', {
+  connection: {
+    host: 'localhost',
+    port: 6379,
+  },
+});
+
+const storeEmbeddingTask = async (embedding, metadata) => {
   try {
-    const existingIndexes = await pc.listIndexes();
-    if (!existingIndexes.indexes.some((index) => index.name === indexName)) {
-      // If the index does not exist, create it
-      await pc.createIndex({
-        name: indexName,
-        dimension: 768, // Example dimension for BERT embeddings
-        metric: 'cosine',
-        spec: {
-          serverless: {
-            cloud: 'aws',
-            region: 'us-east-1',
-          },
-        },
-      });
-    } else {
-      console.log(`Index ${indexName} already exists.`);
-    }
+    await embeddingQueue.add('createEmbedding', { embedding, metadata });
+    console.log(
+      `Task added for storing embedding for article: ${metadata.title}`
+    );
   } catch (error) {
-    console.error('Error initializing Pinecone:', error);
+    console.error('Error adding embedding task to queue:', error);
     throw error;
   }
-};
-
-const createEmbedding = async (text) => {
-  const { pipeline } = await import('@xenova/transformers');
-
-  try {
-    const embedder = await pipeline(
-      'feature-extraction',
-      'Xenova/bert-base-uncased'
-    );
-    const embedding = await embedder(text);
-
-    // Return the first embedding vector (which is usually used)
-    return embedding[0];
-  } catch (error) {
-    console.error('Error generating embedding:', error);
-    throw error;
-  }
-};
-
-const reduceEmbeddingToMatchIndex = (embedding, targetSize = 768) => {
-  if (embedding.length > targetSize) {
-    return embedding.slice(0, targetSize); // Truncate to match the index dimension
-  } else if (embedding.length < targetSize) {
-    throw new Error(
-      `Embedding size (${embedding.length}) is smaller than expected dimension (${targetSize}).`
-    );
-  }
-  return embedding; // If the size matches exactly, return as is
-};
-
-const sanitizeId = (id) => {
-  // Replace non-ASCII characters with an underscore or remove them
-  return id.replace(/[^\x00-\x7F]/g, '_');
 };
 
 const storeEmbedding = async (embedding, metadata) => {
@@ -109,6 +71,6 @@ const storeEmbedding = async (embedding, metadata) => {
 };
 
 module.exports = {
-  createEmbedding,
   storeEmbedding,
+  storeEmbeddingTask,
 };

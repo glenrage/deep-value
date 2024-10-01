@@ -9,11 +9,11 @@ const getMockStockData = (req, res) => {
 const getStockDataAndCalculateDCF = async (req, res) => {
   const { ticker } = req.query;
 
-  // const stockData = await stockService.getStockData(ticker);
-  const insiderData = await stockService.getRecentInsiderTrades(ticker);
+  const stockData = await stockService.getStockData(ticker);
+  const insiderData = await stockService.getInsiderSentiment(ticker);
   const additionalData = await stockService.getAdditionalStockData(ticker);
 
-  const dcfInputs = stockService.prepareDCFInputs(NVDA_MOCK, additionalData);
+  const dcfInputs = stockService.prepareDCFInputs(stockData, additionalData);
 
   const {
     freeCashFlow,
