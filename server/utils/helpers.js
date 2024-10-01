@@ -1,11 +1,12 @@
 // Formatting news data for sentiment analysis
-const formatNewsDataForSentiment = (articles) => {
+const formatNewsDataForSentiment = (articles, ticker) => {
   return articles.map((article) => ({
     source: article.source?.name || 'Unknown',
     author: article.author || 'Unknown',
     title: article.title,
     description: article.description,
     content: article.content,
+    ticker: ticker,
   }));
 };
 
