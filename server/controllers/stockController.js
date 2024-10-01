@@ -12,6 +12,7 @@ const getStockDataAndCalculateDCF = async (req, res) => {
   const stockData = await stockService.getStockData(ticker);
   const insiderData = await stockService.getInsiderSentiment(ticker);
   const additionalData = await stockService.getAdditionalStockData(ticker);
+  const historicalData = await stockService.getTechincalAnalysisData(ticker);
 
   const dcfInputs = stockService.prepareDCFInputs(stockData, additionalData);
 
@@ -35,6 +36,7 @@ const getStockDataAndCalculateDCF = async (req, res) => {
     value: dcfResult,
     dcfInputs,
     dcfResult,
+    historicalData,
     insiderData,
   });
 };
