@@ -3,8 +3,7 @@ const yahooFinance = require('yahoo-finance2').default;
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 
 const {
-  getValueByConcept,
-  getValueByLabel,
+  extractFinnhubReports,
   calculateTerminalGrowthRate,
 } = require('../utils/helpers');
 
@@ -78,57 +77,9 @@ const getStockData = async (ticker) => {
     }
 
     // Extract income statement and cash flow for the two most recent years
-    const extractReports = (report) => {
-      const incomeStatementArray = report.report.ic;
-      const cashFlowStatementArray = report.report.cf;
 
-      if (!incomeStatementArray || !cashFlowStatementArray) {
-        throw new Error(
-          'Missing income statement or cash flow statement in the report'
-        );
-      }
-
-      return {
-        revenue:
-          getValueByConcept(incomeStatementArray, ['us-gaap_Revenues']) ||
-          getValueByLabel(incomeStatementArray, [
-            'revenue',
-            'total revenue',
-            'net sales',
-          ]),
-        operatingIncome: getValueByConcept(incomeStatementArray, [
-          'us-gaap_OperatingIncomeLoss',
-          'us-gaap_IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest',
-          'us-gaap_IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments',
-          'us-gaap_IncomeLossFromContinuingOperationsIncludingPortionAttributableToNoncontrollingInterest',
-        ]),
-        incomeBeforeTax: getValueByConcept(incomeStatementArray, [
-          'us-gaap_IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest',
-        ]), // Income Before Tax
-        interestExpense: getValueByConcept(incomeStatementArray, [
-          'us-gaap_InterestExpense',
-          'us-gaap_InterestAndDebtExpense',
-        ]), // Interest Expense
-        incomeTaxExpense: getValueByLabel(incomeStatementArray, [
-          'income tax expense',
-          'tax expense',
-          'provision for income taxes',
-          'income tax',
-        ]), // Income Tax Expense
-        netCashProvidedByOperatingActivities: getValueByConcept(
-          cashFlowStatementArray,
-          ['us-gaap_NetCashProvidedByUsedInOperatingActivities']
-        ), // Operating cash flow
-        capitalExpenditures: getValueByLabel(cashFlowStatementArray, [
-          'property and equipment',
-          'payments to acquire property',
-          'capex',
-        ]),
-      };
-    };
-
-    const mostRecentReport = extractReports(annualReports[0]);
-    const previousReport = extractReports(annualReports[1]);
+    const mostRecentReport = extractFinnhubReports(annualReports[0]);
+    const previousReport = extractFinnhubReports(annualReports[1]);
 
     // Check if any critical data is missing
     if (!mostRecentReport || !previousReport) {

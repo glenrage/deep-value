@@ -1,18 +1,14 @@
-const { ChatOpenAI } = require('@langchain/openai');
-const { OpenAIEmbeddings } = require('@langchain/openai');
+const { ChatOpenAI, OpenAIEmbeddings } = require('@langchain/openai');
 const {
   PromptTemplate,
   PipelinePromptTemplate,
   HumanMessagePromptTemplate,
 } = require('@langchain/core/prompts');
 const { SystemMessage, HumanMessage } = require('@langchain/core/messages');
-
 const pineconeService = require('../services/pineconeService');
 const stockService = require('../services/stockService');
 const aiService = require('../services/aiService');
 const axios = require('axios');
-const { NVDA_MOCK } = require('../mocks');
-
 const {
   formatNewsDataForSentiment,
   truncateText,
@@ -21,207 +17,201 @@ const {
 const model = new ChatOpenAI({ model: 'gpt-3.5-turbo-0125', temperature: 0.7 });
 const embeddingsModel = new OpenAIEmbeddings();
 
-// Define prompts for stock analysis
-const stockDataPrompt = PromptTemplate.fromTemplate(
-  `Retrieve stock data for ticker: {ticker}.`
-);
-const dcfCalculationPrompt = PromptTemplate.fromTemplate(
-  `Calculate the DCF value using the provided stock data: {stockData} and additional data: {additionalData}.`
-);
-const insiderSentimentPrompt = PromptTemplate.fromTemplate(
-  `The insider sentiment for the stock ticker {ticker} is given below: {insiderSentiment}. 
-  Based on this data, analyze whether the insider sentiment is positive or negative, and discuss how it might affect the stock's future performance.`
-);
-const aiExplanationPrompt = PromptTemplate.fromTemplate(
-  `Provide an AI explanation of the DCF result: {dcfResult} with additional stock information: {additionalData}.`
-);
-const sentimentAnalysisPrompt = PromptTemplate.fromTemplate(
-  `Analyze the sentiment of the following news articles: {formattedNews}. Provide a summary of whether they are positive, negative, or neutral.`
-);
+// Define prompts
+const prompts = {
+  stockData: PromptTemplate.fromTemplate(
+    `Retrieve stock data for ticker: {ticker}.`
+  ),
+  dcfCalculation: PromptTemplate.fromTemplate(
+    `Calculate the DCF value using the provided stock data: {stockData} and additional data: {additionalData}.`
+  ),
+  insiderSentiment: PromptTemplate.fromTemplate(
+    `The insider sentiment for the stock ticker {ticker} is given below: {insiderSentiment}. Based on this data, analyze whether the insider sentiment is positive or negative, and discuss how it might affect the stock's future performance.`
+  ),
+  aiExplanation: PromptTemplate.fromTemplate(
+    `Provide an AI explanation of the DCF result: {dcfResult} with additional stock information: {additionalData}.`
+  ),
+  sentimentAnalysis: PromptTemplate.fromTemplate(
+    `Analyze the sentiment of the following news articles: {formattedNews}. Provide a summary of whether they are positive, negative, or neutral.`
+  ),
+};
 
-// Compose prompts together using PipelinePromptTemplate
+// Compose prompts
 const composedPrompt = new PipelinePromptTemplate({
   pipelinePrompts: [
-    {
-      name: 'stockData',
-      prompt: stockDataPrompt,
-    },
-    {
-      name: 'dcfCalculation',
-      prompt: dcfCalculationPrompt,
-    },
-    {
-      name: 'aiExplanation',
-      prompt: aiExplanationPrompt,
-    },
-    {
-      name: 'sentimentAnalysis',
-      prompt: sentimentAnalysisPrompt,
-    },
+    { name: 'stockData', prompt: prompts.stockData },
+    { name: 'dcfCalculation', prompt: prompts.dcfCalculation },
+    { name: 'aiExplanation', prompt: prompts.aiExplanation },
+    { name: 'sentimentAnalysis', prompt: prompts.sentimentAnalysis },
   ],
   finalPrompt: PromptTemplate.fromTemplate(
     `{stockData} {dcfCalculation} {aiExplanation} {sentimentAnalysis}`
   ),
 });
 
-// main pipeline chain for stock analysis
+// Main pipeline chain for stock analysis
 const stockAnalysisPipeline = async (ticker) => {
-  let additionalData;
-  let dcfResult;
-  let aiExplanation;
-  let sentimentResults;
-  let insiderSentiment;
   try {
-    // Step 1: Get Stock Data
-    try {
-      additionalData = await stockService.getAdditionalStockData(ticker);
-      insiderSentiment = await stockService.getInsiderSentiment(ticker);
-    } catch (error) {
-      console.error(
-        `Error fetching additional stock data for ticker: ${ticker}`,
-        error
-      );
-      throw new Error('Failed to fetch additional stock data');
-    }
+    const stockData = await fetchStockData(ticker);
+    const dcfResult = await performDCFCalculation(ticker, stockData);
+    const aiExplanation = await generateAIExplanation(
+      dcfResult,
+      stockData.additionalData
+    );
+    const sentimentResults = await performSentimentAnalysis(ticker);
+    const insiderSentiment = await analyzeInsiderSentiment(
+      ticker,
+      stockData.insiderSentiment
+    );
 
-    // Step 2: Perform DCF Calculation
-    try {
-      const dcfInputs = stockService.prepareDCFInputs(
-        NVDA_MOCK,
-        additionalData
-      );
-      const {
-        freeCashFlow,
-        growthRate,
-        discountRate,
-        terminalGrowthRate,
-        sharesOutstanding,
-      } = dcfInputs;
-
-      dcfResult = stockService.calculateDCFAllScenarios(
-        freeCashFlow,
-        growthRate,
-        discountRate,
-        terminalGrowthRate,
-        sharesOutstanding
-      );
-    } catch (error) {
-      console.error(`Error calculating DCF for ticker: ${ticker}`, error);
-      throw new Error('Failed to calculate DCF');
-    }
-
-    // Step 3: AI Explanation of DCF & stock financial metrics
-    try {
-      aiExplanation = await aiService.getAIExplanation(
-        dcfResult,
-        additionalData
-      );
-    } catch (error) {
-      console.error(
-        `Error generating AI explanation for ticker: ${ticker}`,
-        error
-      );
-      throw new Error('Failed to generate AI explanation');
-    }
-
-    // Step 4: Perform Sentiment Analysis on News Articles
-    try {
-      const news = await axios.get(
-        `https://newsapi.org/v2/everything?q=${ticker}&apiKey=${process.env.NEWSAPI_KEY}`
-      );
-
-      const formattedNews = formatNewsDataForSentiment(news.data.articles);
-
-      sentimentResults = await Promise.all(
-        formattedNews.slice(0, 5).map(async (article) => {
-          if (article.content) {
-            const truncatedContent = truncateText(article.content, 500);
-
-            const sentimentPrompt = HumanMessagePromptTemplate.fromTemplate(
-              "Analyze the sentiment of the following text: {text}. Provide a summary of whether it's positive, negative, or neutral."
-            );
-
-            const formattedMessage = await sentimentPrompt.format({
-              text: truncatedContent,
-            });
-
-            const sentimentResult = await model.call([
-              new SystemMessage('You are a sentiment analysis model.'),
-              new HumanMessage(formattedMessage),
-            ]);
-
-            const embedding =
-              await embeddingsModel.embedQuery(truncatedContent);
-
-            await pineconeService.storeEmbedding(embedding, {
-              title: article.title,
-              source: article.source,
-              author: article.author,
-              sentiment: sentimentResult.content,
-            });
-
-            return { ...article, sentiment: sentimentResult.content };
-          }
-          return article;
-        })
-      );
-    } catch (error) {
-      console.error(
-        `Error performing sentiment analysis for ticker: ${ticker}`,
-        error
-      );
-      throw new Error('Failed to perform sentiment analysis');
-    }
-
-    // Step 5: Analyze Insider Sentiment
-    try {
-      const formattedInsiderSentiment = JSON.stringify(insiderSentiment);
-      const formattedPrompt = await insiderSentimentPrompt.format({
-        ticker,
-        insiderSentiment: formattedInsiderSentiment,
-      });
-
-      const insiderSentimentResult = await model.call([
-        new HumanMessage(formattedPrompt),
-      ]);
-      insiderSentiment = insiderSentimentResult.content;
-    } catch (error) {
-      console.error(
-        `Error analyzing insider sentiment for ticker: ${ticker}`,
-        error
-      );
-      throw new Error('Failed to analyze insider sentiment');
-    }
-
-    // Execute composed prompt with formatted data
-    try {
-      const formattedPrompt = await composedPrompt.format({
-        ticker,
-        stockData: JSON.stringify(NVDA_MOCK),
+    return {
+      dcfAnalysis: dcfResult,
+      aiExplanation,
+      sentimentAnalysis: sentimentResults,
+      insiderSentiment,
+      formattedPrompt: await composeFinalPrompt(ticker, {
+        stockData: JSON.stringify(stockData),
         dcfCalculation: JSON.stringify(dcfResult),
-        additionalData: JSON.stringify(additionalData),
+        additionalData: JSON.stringify(stockData.additionalData),
         formattedNews: JSON.stringify(sentimentResults),
         aiExplanation,
         insiderSentiment,
-      });
-
-      return {
-        dcfAnalysis: dcfResult,
-        aiExplanation,
-        sentimentAnalysis: sentimentResults,
-        insiderSentiment,
-        formattedPrompt,
-      };
-    } catch (error) {
-      console.error(
-        `Error composing final prompt for ticker: ${ticker}`,
-        error
-      );
-      throw new Error('Failed to compose final prompt');
-    }
+      }),
+    };
   } catch (error) {
     console.error('Error running stock analysis pipeline:', error.message);
     throw new Error('Failed to complete stock analysis');
+  }
+};
+
+// Utility function to fetch stock data
+const fetchStockData = async (ticker) => {
+  try {
+    const stockData = await stockService.getStockData(ticker);
+    const additionalData = await stockService.getAdditionalStockData(ticker);
+    const insiderSentiment = await stockService.getInsiderSentiment(ticker);
+    return { ...stockData, additionalData, insiderSentiment };
+  } catch (error) {
+    console.error(`Error fetching stock data for ticker: ${ticker}`, error);
+    throw new Error('Failed to fetch stock data');
+  }
+};
+
+// Utility function to perform DCF calculation
+const performDCFCalculation = async (ticker, stockData) => {
+  try {
+    const dcfInputs = stockService.prepareDCFInputs(
+      stockData,
+      stockData.additionalData
+    );
+    return stockService.calculateDCFAllScenarios(
+      dcfInputs.freeCashFlow,
+      dcfInputs.growthRate,
+      dcfInputs.discountRate,
+      dcfInputs.terminalGrowthRate,
+      dcfInputs.sharesOutstanding
+    );
+  } catch (error) {
+    console.error(`Error calculating DCF for ticker: ${ticker}`, error);
+    throw new Error('Failed to calculate DCF');
+  }
+};
+
+// Utility function to generate AI explanation
+const generateAIExplanation = async (dcfResult, additionalData) => {
+  try {
+    return await aiService.getAIExplanation(dcfResult, additionalData);
+  } catch (error) {
+    console.error('Error generating AI explanation', error);
+    throw new Error('Failed to generate AI explanation');
+  }
+};
+
+// Utility function to perform sentiment analysis
+const performSentimentAnalysis = async (ticker) => {
+  try {
+    const news = await axios.get(
+      `https://newsapi.org/v2/everything?q=${ticker}&apiKey=${process.env.NEWSAPI_KEY}`
+    );
+    const formattedNews = formatNewsDataForSentiment(news.data.articles);
+    return await Promise.all(
+      formattedNews.slice(0, 5).map(async (article) => {
+        if (article.content) {
+          const truncatedContent = truncateText(article.content, 500);
+          const sentimentResult = await analyzeSentiment(truncatedContent);
+
+          // Add embedding task to the queue (do not await here)
+          embeddingsModel
+            .embedQuery(truncatedContent)
+            .then((embedding) => {
+              pineconeService.storeEmbeddingTask(embedding, {
+                title: article.title,
+                source: article.source,
+                author: article.author,
+                sentiment: sentimentResult,
+              });
+            })
+            .catch((err) => {
+              console.error('Error generating/storing embedding:', err);
+            });
+
+          return { ...article, sentiment: sentimentResult };
+        }
+        return article;
+      })
+    );
+  } catch (error) {
+    console.error(
+      `Error performing sentiment analysis for ticker: ${ticker}`,
+      error
+    );
+    throw new Error('Failed to perform sentiment analysis');
+  }
+};
+
+// Utility function to analyze sentiment using AI
+const analyzeSentiment = async (text) => {
+  try {
+    const sentimentPrompt = HumanMessagePromptTemplate.fromTemplate(
+      "Analyze the sentiment of the following text: {text}. Provide a summary of whether it's positive, negative, or neutral."
+    );
+    const formattedMessage = await sentimentPrompt.format({ text });
+    const sentimentResult = await model.call([
+      new SystemMessage('You are a sentiment analysis model.'),
+      new HumanMessage(formattedMessage),
+    ]);
+    return sentimentResult.content;
+  } catch (error) {
+    console.error('Error analyzing sentiment:', error);
+    throw new Error('Failed to analyze sentiment');
+  }
+};
+
+// Utility function to analyze insider sentiment
+const analyzeInsiderSentiment = async (ticker, insiderSentiment) => {
+  try {
+    const formattedPrompt = await prompts.insiderSentiment.format({
+      ticker,
+      insiderSentiment: JSON.stringify(insiderSentiment),
+    });
+    const result = await model.call([new HumanMessage(formattedPrompt)]);
+    return result.content;
+  } catch (error) {
+    console.error(
+      `Error analyzing insider sentiment for ticker: ${ticker}`,
+      error
+    );
+    throw new Error('Failed to analyze insider sentiment');
+  }
+};
+
+// Utility function to compose final prompt
+const composeFinalPrompt = async (ticker, promptData) => {
+  try {
+    return await composedPrompt.format(promptData);
+  } catch (error) {
+    console.error(`Error composing final prompt for ticker: ${ticker}`, error);
+    throw new Error('Failed to compose final prompt');
   }
 };
 
@@ -231,6 +221,7 @@ const getFullStockAnalysis = async (req, res) => {
 
   try {
     const analysisResult = await stockAnalysisPipeline(ticker);
+
     res.json(analysisResult);
   } catch (error) {
     console.error('Error running stock analysis pipeline:', error.message);
