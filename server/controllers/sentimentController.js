@@ -1,7 +1,6 @@
 const { ChatOpenAI, OpenAIEmbeddings } = require('@langchain/openai');
 const {
   PromptTemplate,
-  PipelinePromptTemplate,
   HumanMessagePromptTemplate,
 } = require('@langchain/core/prompts');
 const { SystemMessage, HumanMessage } = require('@langchain/core/messages');
@@ -38,20 +37,6 @@ const prompts = {
     `Analyze the sentiment of the following news articles: {formattedNews}. Provide a summary of whether they are positive, negative, or neutral.`
   ),
 };
-
-// Compose prompts
-const composedPrompt = new PipelinePromptTemplate({
-  pipelinePrompts: [
-    { name: 'stockData', prompt: prompts.stockData },
-    { name: 'dcfCalculation', prompt: prompts.dcfCalculation },
-    { name: 'technicalAnalysis', prompt: prompts.technicalAnalysis },
-    { name: 'aiExplanation', prompt: prompts.aiExplanation },
-    { name: 'sentimentAnalysis', prompt: prompts.sentimentAnalysis },
-  ],
-  finalPrompt: PromptTemplate.fromTemplate(
-    `{stockData} {dcfCalculation} {aiExplanation} {sentimentAnalysis} {technicalAnalysis}`
-  ),
-});
 
 // Utility function to fetch stock data
 const fetchStockData = async (ticker) => {
@@ -122,7 +107,7 @@ const performSentimentAnalysis = async (ticker) => {
           const sentimentScore =
             sentimentService.getSentimentScore(sentimentResult);
 
-          // Store embeddings in Pinecone
+          // Store embeddings in Pinecone and offload embeddings storage to message queue
           sentimentService.storeSentimentAnalysisEmbedding(
             embeddingsModel,
             article,
@@ -252,6 +237,22 @@ const getFullStockAnalysis = async (req, res) => {
   }
 };
 
+const searchArticlesBySentiment = async (req, res) => {
+  const { sentiment, ticker } = req.query;
+
+  try {
+    const searchResults = await sentimentService.queryArticlesBySentiment(
+      ticker,
+      sentiment
+    );
+    res.json(searchResults);
+  } catch (error) {
+    console.error('Error searching stock sentiment:', error);
+    res.status(500).json({ error: 'Failed to search stock sentiment' });
+  }
+};
+
 module.exports = {
   getFullStockAnalysis,
+  searchArticlesBySentiment,
 };

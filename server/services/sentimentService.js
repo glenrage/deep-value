@@ -128,10 +128,43 @@ const getSentimentScore = (sentimentResult) => {
   return 0;
 };
 
+// New function to query Pinecone for articles based on sentiment
+const queryArticlesBySentiment = async (ticker, sentiment) => {
+  try {
+    await initPinecone();
+    const index = pc.Index(indexName);
+
+    // Formulating the query to find articles based on the given ticker and sentiment
+    const queryResponse = await index.query({
+      topK: 10,
+      includeMetadata: true,
+      filter: {
+        AND: [{ ticker: ticker }, { sentiment: sentiment }],
+      },
+    });
+
+    if (queryResponse && queryResponse.matches) {
+      return queryResponse.matches.map((match) => ({
+        id: match.id,
+        title: match.metadata.title,
+        source: match.metadata.source,
+        author: match.metadata.author,
+        sentiment: match.metadata.sentiment,
+      }));
+    }
+
+    return [];
+  } catch (error) {
+    console.error('Error querying Pinecone for articles by sentiment:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   storeSentimentAnalysisEmbedding,
   storeEmbedding,
   storeEmbeddingTask,
   getSentimentScore,
   calculateSentimentSummary,
+  queryArticlesBySentiment,
 };
