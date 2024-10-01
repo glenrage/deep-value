@@ -97,7 +97,10 @@ const generateAItechnicalExplanation = async (data, ticker) => {
 const performSentimentAnalysis = async (ticker) => {
   try {
     const news = await fetchStockNewsArticles(ticker);
-    const formattedNews = formatNewsDataForSentiment(news.data.articles);
+    const formattedNews = formatNewsDataForSentiment(
+      news.data.articles,
+      ticker
+    );
 
     const sentimentResults = await Promise.all(
       formattedNews.slice(0, 5).map(async (article) => {
@@ -252,7 +255,22 @@ const searchArticlesBySentiment = async (req, res) => {
   }
 };
 
+const searchSemnaticArticles = async (req, res) => {
+  const query = req.query;
+
+  try {
+    const searchResults = await sentimentService.querySimliarArticles(
+      query.query
+    );
+    res.json(searchResults);
+  } catch (error) {
+    console.error('Error searching stock sentiment:', error);
+    res.status(500).json({ error: 'Failed to search stock sentiment' });
+  }
+};
+
 module.exports = {
   getFullStockAnalysis,
   searchArticlesBySentiment,
+  searchSemnaticArticles,
 };

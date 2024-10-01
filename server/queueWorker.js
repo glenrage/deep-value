@@ -2,35 +2,10 @@ require('dotenv').config();
 
 const { Worker } = require('bullmq');
 const { Pinecone } = require('@pinecone-database/pinecone');
-const { reduceEmbeddingToMatchIndex, sanitizeId } = require('./utils/helpers');
+const { sanitizeId } = require('./utils/helpers');
+const { initPinecone } = require('./services/sentimentService');
 
-const indexName = 'quickstart';
 const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
-
-const initPinecone = async () => {
-  try {
-    const existingIndexes = await pc.listIndexes();
-    if (!existingIndexes.indexes.some((index) => index.name === indexName)) {
-      // If the index does not exist, create it
-      await pc.createIndex({
-        name: indexName,
-        dimension: 768, // Example dimension for BERT embeddings
-        metric: 'cosine',
-        spec: {
-          serverless: {
-            cloud: 'aws',
-            region: 'us-east-1',
-          },
-        },
-      });
-    } else {
-      console.log(`Index ${indexName} already exists.`);
-    }
-  } catch (error) {
-    console.error('Error initializing Pinecone:', error);
-    throw error;
-  }
-};
 
 // Create a new worker to handle the embedding jobs
 const embeddingWorker = new Worker(
@@ -40,9 +15,9 @@ const embeddingWorker = new Worker(
 
     const { embedding, metadata } = job.data;
     try {
+      const indexName = 'stock';
       await initPinecone();
       const index = pc.Index(indexName);
-      const flatEmbedding = reduceEmbeddingToMatchIndex(embedding, 768);
       const sanitizedId = sanitizeId(metadata.title);
 
       const existingEmbedding = await index.fetch([sanitizedId]);
@@ -59,12 +34,14 @@ const embeddingWorker = new Worker(
       await index.upsert([
         {
           id: sanitizedId,
-          values: flatEmbedding,
+          values: embedding,
           metadata: {
             title: metadata.title,
             source: metadata.source,
             author: metadata.author,
             sentiment: JSON.stringify(metadata.sentiment),
+            ticker: metadata.ticker,
+            sentimentCategory: metadata.sentimentCategory,
           },
         },
       ]);

@@ -1,9 +1,16 @@
 const { Pinecone } = require('@pinecone-database/pinecone');
 const { Queue } = require('bullmq');
-const { truncateText, sanitizeId } = require('../utils/helpers');
-const indexName = 'quickstart';
+const { OpenAIEmbeddings } = require('@langchain/openai');
+
+const { truncateText } = require('../utils/helpers');
 
 const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
+const indexName = 'stock';
+
+// Use OpenAIEmbeddings with the correct model and dimensions
+const embeddingsModel = new OpenAIEmbeddings({
+  modelName: 'text-embedding-ada-002',
+});
 
 // Create a queue for embedding creation
 const embeddingQueue = new Queue('embeddingQueue', {
@@ -12,6 +19,44 @@ const embeddingQueue = new Queue('embeddingQueue', {
     port: 6379,
   },
 });
+
+const initPinecone = async () => {
+  const indexName = 'stock';
+
+  try {
+    const existingIndexes = await pc.listIndexes();
+    if (!existingIndexes.indexes.some((index) => index.name === indexName)) {
+      // If the index does not exist, create it
+      await pc.createIndex({
+        name: indexName,
+        dimension: 1536,
+        metric: 'cosine',
+        spec: {
+          serverless: {
+            cloud: 'aws',
+            region: 'us-east-1',
+          },
+        },
+      });
+    } else {
+      console.log(`Index ${indexName} already exists.`);
+    }
+  } catch (error) {
+    console.error('Error initializing Pinecone:', error);
+    throw error;
+  }
+};
+
+// Simplify the sentiment before storing
+const simplifiedSentiment = (sentimentResult) => {
+  if (sentimentResult.includes('positive')) {
+    return 'positive';
+  } else if (sentimentResult.includes('negative')) {
+    return 'negative';
+  } else {
+    return 'neutral';
+  }
+};
 
 const storeEmbeddingTask = async (embedding, metadata) => {
   try {
@@ -25,51 +70,6 @@ const storeEmbeddingTask = async (embedding, metadata) => {
   }
 };
 
-const storeEmbedding = async (embedding, metadata) => {
-  try {
-    await initPinecone();
-
-    const index = pc.Index(indexName);
-
-    const flatEmbedding = Array.isArray(embedding)
-      ? reduceEmbeddingToMatchIndex(embedding, 768)
-      : reduceEmbeddingToMatchIndex(Array.from(embedding.data), 768);
-
-    const sentimentString = JSON.stringify(metadata.sentiment);
-    const sanitizedId = sanitizeId(metadata.title);
-
-    const existingEmbedding = await index.fetch([sanitizedId]);
-
-    if (
-      existingEmbedding &&
-      Object.keys(existingEmbedding.records).length > 0
-    ) {
-      console.log(
-        `Embedding for ${metadata.title} already exists in Pinecone. Skipping insertion.`
-      );
-      return;
-    }
-
-    await index.upsert([
-      {
-        id: sanitizedId, // Use the article title or generate a unique ID
-        values: flatEmbedding,
-        metadata: {
-          title: metadata.title,
-          source: metadata.source,
-          author: metadata.author,
-          sentiment: sentimentString, // Convert sentiment array to a JSON string
-        },
-      },
-    ]);
-
-    console.log(`Stored embedding for article: ${metadata.title}`);
-  } catch (error) {
-    console.error('Error storing embedding in Pinecone:', error);
-    throw error;
-  }
-};
-
 // New function to handle embedding storage for sentiment analysis
 const storeSentimentAnalysisEmbedding = async (
   embeddingsModel,
@@ -77,14 +77,18 @@ const storeSentimentAnalysisEmbedding = async (
   sentimentResult
 ) => {
   try {
-    const truncatedContent = truncateText(article.content, 500);
-    const embedding = await embeddingsModel.embedQuery(truncatedContent);
+    // Create a more informative embedding input by including title and author
+    const enrichedContent = `${article.title} by ${article.author}. ${truncateText(article.content, 1000)}`;
+    const embedding = await embeddingsModel.embedQuery(enrichedContent);
+    const sentimentCategory = simplifiedSentiment(sentimentResult);
 
     await storeEmbeddingTask(embedding, {
       title: article.title,
       source: article.source,
       author: article.author,
       sentiment: sentimentResult,
+      ticker: article.ticker,
+      sentimentCategory,
     });
   } catch (err) {
     console.error('Error generating/storing embedding:', err);
@@ -134,12 +138,19 @@ const queryArticlesBySentiment = async (ticker, sentiment) => {
     await initPinecone();
     const index = pc.Index(indexName);
 
-    // Formulating the query to find articles based on the given ticker and sentiment
+    // Create a dummy query embedding (could use a more representative vector)
+    const queryEmbedding = await embeddingsModel.embedQuery(
+      `Find articles about ${ticker} with a ${sentiment} sentiment`
+    );
+
+    // Perform a similarity query, including metadata filtering for sentiment and ticker
     const queryResponse = await index.query({
+      vector: queryEmbedding,
       topK: 10,
       includeMetadata: true,
       filter: {
-        AND: [{ ticker: ticker }, { sentiment: sentiment }],
+        ticker: ticker,
+        sentiment: sentiment,
       },
     });
 
@@ -150,6 +161,8 @@ const queryArticlesBySentiment = async (ticker, sentiment) => {
         source: match.metadata.source,
         author: match.metadata.author,
         sentiment: match.metadata.sentiment,
+        ticker: match.metadata.ticker,
+        sentimentCategory: match.metadata.sentimentCategory,
       }));
     }
 
@@ -160,11 +173,49 @@ const queryArticlesBySentiment = async (ticker, sentiment) => {
   }
 };
 
+const querySimliarArticles = async (queryText) => {
+  console.log('Querying for similar articles:', queryText);
+  try {
+    await initPinecone();
+    const index = pc.Index(indexName);
+
+    const enrichedQueryText = `Find articles related to "${queryText}" in the financial news domain.`;
+    const queryEmbedding = await embeddingsModel.embedQuery(enrichedQueryText);
+
+    // Perform a semantic similarity search with the query embedding
+    const queryResponse = await index.query({
+      vector: queryEmbedding,
+      topK: 10,
+      includeMetadata: true,
+    });
+
+    console.log('Query response:', queryResponse);
+    console.log('Matches:', queryResponse.matches);
+
+    if (queryResponse && queryResponse.matches) {
+      return queryResponse.matches.map((match) => ({
+        id: match.id,
+        title: match.metadata.title,
+        source: match.metadata.source,
+        author: match.metadata.author,
+        sentiment: match.metadata.sentimentCategory,
+        ticker: match.metadata.ticker,
+      }));
+    }
+
+    return [];
+  } catch (error) {
+    console.error('Error performing semantic search:', error);
+    throw error;
+  }
+};
+
 module.exports = {
+  initPinecone,
   storeSentimentAnalysisEmbedding,
-  storeEmbedding,
   storeEmbeddingTask,
   getSentimentScore,
   calculateSentimentSummary,
   queryArticlesBySentiment,
+  querySimliarArticles,
 };
