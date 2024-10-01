@@ -1,6 +1,11 @@
-const axios = require('axios');
-const yahooFinance = require('yahoo-finance2').default;
-const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
+const {
+  fetchStockData,
+  fetchAdditionalStockData,
+  fetchInsiderSentiment,
+  fetchHistoricalData,
+} = require('../utils/queries');
+
+const { calculateTechnicalIndicators } = require('../utils/calculations');
 
 const {
   extractFinnhubReports,
@@ -9,61 +14,52 @@ const {
 
 const getInsiderSentiment = async (ticker) => {
   try {
-    const url = `https://finnhub.io/api/v1/stock/insider-sentiment`;
-    const response = await axios.get(url, {
-      params: {
-        symbol: ticker,
-        token: FINNHUB_API_KEY,
-      },
-    });
-
-    return response.data;
+    return await fetchInsiderSentiment(ticker);
   } catch (error) {
-    console.error(`Error fetching insider trades for ticker: ${ticker}`, error);
-    throw new Error('Failed to fetch recent insider trades data');
+    console.error(
+      `Error fetching insider sentiment for ${ticker}:`,
+      error.message
+    );
+    throw new Error('Failed to fetch insider sentiment data');
   }
 };
 
 // Fetch additional data
 const getAdditionalStockData = async (ticker) => {
   try {
-    // Fetch market capitalization, beta, shares outstanding, etc.
-    const quoteSummary = await yahooFinance.quoteSummary(ticker, {
-      modules: ['summaryDetail', 'defaultKeyStatistics'],
-    });
+    return await fetchAdditionalStockData(ticker);
+  } catch (error) {
+    console.error(
+      `Error fetching additional stock data for ${ticker}:`,
+      error.message
+    );
+    throw new Error('Failed to fetch additional stock data');
+  }
+};
 
-    const marketCap = quoteSummary.summaryDetail.marketCap;
-    const beta = quoteSummary.defaultKeyStatistics.beta;
-    const sharesOutstanding =
-      quoteSummary.defaultKeyStatistics.sharesOutstanding;
-    const currentPrice = quoteSummary.summaryDetail.previousClose;
+const getTechincalAnalysisData = async (ticker) => {
+  try {
+    const data = await fetchHistoricalData(ticker);
+
+    const calculatedTAIndicators = calculateTechnicalIndicators(data);
 
     return {
-      currentPrice,
-      marketCap,
-      beta,
-      sharesOutstanding,
-      keyStats: quoteSummary,
+      indicators: calculatedTAIndicators,
+      historicalData: data,
     };
   } catch (error) {
-    console.error('Error fetching Yahoo stock data:', error);
-    throw new Error('Unable to fetch additional stock data');
+    console.error(
+      `Error fetching historical data for ${ticker}:`,
+      error.message
+    );
+    throw new Error('Failed to fetch historical stock data');
   }
 };
 
 const getStockData = async (ticker) => {
   try {
-    // Fetch financials report (income statement and cash flow) with annual frequency
-    const financialsUrl = `https://finnhub.io/api/v1/stock/financials-reported`;
-    const financialsResponse = await axios.get(financialsUrl, {
-      params: {
-        symbol: ticker,
-        token: FINNHUB_API_KEY,
-        freq: 'annual',
-      },
-    });
+    const financialsData = await fetchStockData(ticker);
 
-    const financialsData = financialsResponse.data.data;
     if (!financialsData || financialsData.length === 0) {
       throw new Error('No financial data available');
     }
@@ -351,4 +347,5 @@ module.exports = {
   getStockData,
   getAdditionalStockData,
   getInsiderSentiment,
+  getTechincalAnalysisData,
 };

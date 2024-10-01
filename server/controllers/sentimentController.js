@@ -17,13 +17,15 @@ const {
 const model = new ChatOpenAI({ model: 'gpt-3.5-turbo-0125', temperature: 0.7 });
 const embeddingsModel = new OpenAIEmbeddings();
 
-// Define prompts
 const prompts = {
   stockData: PromptTemplate.fromTemplate(
     `Retrieve stock data for ticker: {ticker}.`
   ),
   dcfCalculation: PromptTemplate.fromTemplate(
     `Calculate the DCF value using the provided stock data: {stockData} and additional data: {additionalData}.`
+  ),
+  technicalAnalysis: PromptTemplate.fromTemplate(
+    `Perform technical analysis on the stock data: {aiTAexplanation}.`
   ),
   insiderSentiment: PromptTemplate.fromTemplate(
     `The insider sentiment for the stock ticker {ticker} is given below: {insiderSentiment}. Based on this data, analyze whether the insider sentiment is positive or negative, and discuss how it might affect the stock's future performance.`
@@ -41,11 +43,12 @@ const composedPrompt = new PipelinePromptTemplate({
   pipelinePrompts: [
     { name: 'stockData', prompt: prompts.stockData },
     { name: 'dcfCalculation', prompt: prompts.dcfCalculation },
+    { name: 'technicalAnalysis', prompt: prompts.technicalAnalysis },
     { name: 'aiExplanation', prompt: prompts.aiExplanation },
     { name: 'sentimentAnalysis', prompt: prompts.sentimentAnalysis },
   ],
   finalPrompt: PromptTemplate.fromTemplate(
-    `{stockData} {dcfCalculation} {aiExplanation} {sentimentAnalysis}`
+    `{stockData} {dcfCalculation} {aiExplanation} {sentimentAnalysis} {technicalAnalysis}`
   ),
 });
 
@@ -54,6 +57,10 @@ const stockAnalysisPipeline = async (ticker) => {
   try {
     const stockData = await fetchStockData(ticker);
     const dcfResult = await performDCFCalculation(ticker, stockData);
+    const aiTAexplanation = await generateAItechnicalExplanation(
+      stockData.technicalData.indicators,
+      ticker
+    );
     const aiExplanation = await generateAIExplanation(
       dcfResult,
       stockData.additionalData
@@ -68,9 +75,11 @@ const stockAnalysisPipeline = async (ticker) => {
       dcfAnalysis: dcfResult,
       aiExplanation,
       sentimentAnalysis: sentimentResults,
+      aiTAexplanation,
       insiderSentiment,
       formattedPrompt: await composeFinalPrompt(ticker, {
         stockData: JSON.stringify(stockData),
+        aiTAexplanation,
         dcfCalculation: JSON.stringify(dcfResult),
         additionalData: JSON.stringify(stockData.additionalData),
         formattedNews: JSON.stringify(sentimentResults),
@@ -89,8 +98,10 @@ const fetchStockData = async (ticker) => {
   try {
     const stockData = await stockService.getStockData(ticker);
     const additionalData = await stockService.getAdditionalStockData(ticker);
+    const technicalData = await stockService.getTechincalAnalysisData(ticker);
     const insiderSentiment = await stockService.getInsiderSentiment(ticker);
-    return { ...stockData, additionalData, insiderSentiment };
+
+    return { ...stockData, additionalData, technicalData, insiderSentiment };
   } catch (error) {
     console.error(`Error fetching stock data for ticker: ${ticker}`, error);
     throw new Error('Failed to fetch stock data');
@@ -117,13 +128,23 @@ const performDCFCalculation = async (ticker, stockData) => {
   }
 };
 
-// Utility function to generate AI explanation
+// Utility function to generate AI stock explanation
 const generateAIExplanation = async (dcfResult, additionalData) => {
   try {
-    return await aiService.getAIExplanation(dcfResult, additionalData);
+    return await aiService.getStockExplanation(dcfResult, additionalData);
   } catch (error) {
     console.error('Error generating AI explanation', error);
     throw new Error('Failed to generate AI explanation');
+  }
+};
+
+// Utility function to generate AI technical analysis explanation
+const generateAItechnicalExplanation = async (data, ticker) => {
+  try {
+    return await aiService.getTAExplanation(data, ticker);
+  } catch (error) {
+    console.error('Error generating technical AI explanation', error);
+    throw new Error('Failed to generate technical AI explanation');
   }
 };
 
@@ -134,7 +155,13 @@ const performSentimentAnalysis = async (ticker) => {
       `https://newsapi.org/v2/everything?q=${ticker}&apiKey=${process.env.NEWSAPI_KEY}`
     );
     const formattedNews = formatNewsDataForSentiment(news.data.articles);
-    return await Promise.all(
+
+    let positiveCount = 0;
+    let negativeCount = 0;
+    let neutralCount = 0;
+    let overallScore = 0;
+
+    const sentimentResults = await Promise.all(
       formattedNews.slice(0, 5).map(async (article) => {
         if (article.content) {
           const truncatedContent = truncateText(article.content, 500);
@@ -155,11 +182,43 @@ const performSentimentAnalysis = async (ticker) => {
               console.error('Error generating/storing embedding:', err);
             });
 
-          return { ...article, sentiment: sentimentResult };
+          // Determine sentiment score
+          let sentimentScore = 0;
+          if (sentimentResult.includes('positive')) {
+            positiveCount++;
+            sentimentScore = 1;
+          } else if (sentimentResult.includes('negative')) {
+            negativeCount++;
+            sentimentScore = -1;
+          } else {
+            neutralCount++;
+            sentimentScore = 0;
+          }
+
+          overallScore += sentimentScore;
+
+          return {
+            ...article,
+            sentiment: sentimentResult,
+            sentimentScore,
+          };
         }
         return article;
       })
     );
+
+    const overallSentiment =
+      overallScore > 0 ? 'positive' : overallScore < 0 ? 'negative' : 'neutral';
+
+    return {
+      overallSentiment,
+      sentimentBreakdown: {
+        positive: positiveCount,
+        negative: negativeCount,
+        neutral: neutralCount,
+      },
+      articles: sentimentResults,
+    };
   } catch (error) {
     console.error(
       `Error performing sentiment analysis for ticker: ${ticker}`,
