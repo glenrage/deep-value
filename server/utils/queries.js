@@ -65,9 +65,18 @@ const fetchHistoricalData = async (ticker) => {
   return historicalData;
 };
 
+const fetchStockNewsArticles = async (ticker) => {
+  const news = await axios.get(
+    `https://newsapi.org/v2/everything?q=${ticker}&apiKey=${process.env.NEWSAPI_KEY}`
+  );
+
+  return news;
+};
+
 module.exports = {
   fetchStockData,
   fetchAdditionalStockData,
   fetchInsiderSentiment,
   fetchHistoricalData,
+  fetchStockNewsArticles,
 };
