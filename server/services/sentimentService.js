@@ -1,6 +1,6 @@
 const { Pinecone } = require('@pinecone-database/pinecone');
 const { Queue } = require('bullmq');
-
+const { truncateText, sanitizeId } = require('../utils/helpers');
 const indexName = 'quickstart';
 
 const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
@@ -70,7 +70,68 @@ const storeEmbedding = async (embedding, metadata) => {
   }
 };
 
+// New function to handle embedding storage for sentiment analysis
+const storeSentimentAnalysisEmbedding = async (
+  embeddingsModel,
+  article,
+  sentimentResult
+) => {
+  try {
+    const truncatedContent = truncateText(article.content, 500);
+    const embedding = await embeddingsModel.embedQuery(truncatedContent);
+
+    await storeEmbeddingTask(embedding, {
+      title: article.title,
+      source: article.source,
+      author: article.author,
+      sentiment: sentimentResult,
+    });
+  } catch (err) {
+    console.error('Error generating/storing embedding:', err);
+  }
+};
+
+const calculateSentimentSummary = (sentimentResults) => {
+  let positiveCount = 0;
+  let negativeCount = 0;
+  let neutralCount = 0;
+  let overallScore = 0;
+
+  sentimentResults.forEach((result) => {
+    if (result.sentiment.includes('positive')) {
+      positiveCount++;
+      overallScore += 1;
+    } else if (result.sentiment.includes('negative')) {
+      negativeCount++;
+      overallScore -= 1;
+    } else {
+      neutralCount++;
+    }
+  });
+
+  const overallSentiment =
+    overallScore > 0 ? 'positive' : overallScore < 0 ? 'negative' : 'neutral';
+
+  return {
+    overallSentiment,
+    sentimentBreakdown: {
+      positive: positiveCount,
+      negative: negativeCount,
+      neutral: neutralCount,
+    },
+  };
+};
+
+const getSentimentScore = (sentimentResult) => {
+  if (sentimentResult.includes('positive')) return 1;
+  if (sentimentResult.includes('negative')) return -1;
+  return 0;
+};
+
 module.exports = {
+  storeSentimentAnalysisEmbedding,
   storeEmbedding,
   storeEmbeddingTask,
+  getSentimentScore,
+  calculateSentimentSummary,
 };
