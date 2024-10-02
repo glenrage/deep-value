@@ -2,7 +2,7 @@
 
 ## Overview
 
-**Deep Value** is a full-stack application designed to determine a stock's intrinsic value using an AI-enhanced Discounted Cash Flow (DCF) model. It integrates LangChain for dynamic workflows, providing users with detailed stock valuation, AI-driven insights, AI-driven technical analysis and AI-driven news and insider transaction sentiment analysis.
+**Deep Value** is a full-stack application designed to determine a stock's intrinsic value using an AI-enhanced Discounted Cash Flow (DCF) model. It integrates LangChain for dynamic workflows, providing users with detailed stock valuation, AI-driven option chain insights, AI-driven technical analysis and AI-driven news and insider transaction sentiment analysis.
 
 ## Key Features
 
@@ -16,6 +16,7 @@
 
    - Fetches the latest financial data for a given stock ticker.
    - Collects recent insider transaction data to assess insider sentiment.
+   - Fetches options chain for analysis
    - **Example APIs**: Alpha Vantage, Yahoo Finance, FinnHub.
 
 3. **Custom DCF Model Service (AI-Enhanced)**
