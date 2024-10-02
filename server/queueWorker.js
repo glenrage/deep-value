@@ -9,16 +9,14 @@ const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
 
 let redisConnectionOptions;
 
-if (process.env.NODE_ENV === 'production') {
-  // Use Upstash Redis URL in production
-  redisConnectionOptions = {
-    url: process.env.REDIS_URL, // Replace with your Upstash Redis URL from environment variables
-  };
-} else {
-  // Use local Redis in development
+if (process.env.NODE_ENV === 'development') {
   redisConnectionOptions = {
     host: '127.0.0.1',
     port: 6379,
+  };
+} else {
+  redisConnectionOptions = {
+    url: process.env.REDIS_URL,
   };
 }
 

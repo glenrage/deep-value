@@ -18,7 +18,7 @@ app.use('/api/stocks', stockRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/sentiment', sentimentRoutes);
 
-app.get('/', (res) => {
+app.get('/', (req, res) => {
   res.send('Stock server says hi!');
 });
 
