@@ -135,47 +135,67 @@ const processOptionsData = (optionsData) => {
 const generateLLMInputText = (formattedOptionsData) => {
   const { expirationDates, formattedData } = formattedOptionsData;
 
+  // Summarize the expiration dates range
+  const expirationDatesText = `Available Expiration Dates: from ${
+    expirationDates[0]
+  } to ${expirationDates[expirationDates.length - 1]}`;
+
   // Generate summaries for each expiration date in formattedData
   const summaries = formattedData.map((optionChain) => {
     const { expirationDate, callsSummary, putsSummary, putCallRatio, strikes } =
       optionChain;
 
-    // Generate a simple textual representation for each expiration date
+    // Extract only the key calls and puts (e.g., highest volume and open interest)
+    const topCalls = callsSummary
+      .sort((a, b) => b.volume - a.volume)
+      .slice(0, 3)
+      .map(
+        (call) =>
+          `Strike: ${call.strike}, Last Price: ${call.lastPrice}, Volume: ${
+            call.volume
+          }, OI: ${call.openInterest}, IV: ${call.impliedVolatility.toFixed(
+            2
+          )}, In-The-Money: ${call.inTheMoney}`
+      )
+      .join('\n');
+
+    const topPuts = putsSummary
+      .sort((a, b) => b.volume - a.volume)
+      .slice(0, 3)
+      .map(
+        (put) =>
+          `Strike: ${put.strike}, Last Price: ${put.lastPrice}, Volume: ${
+            put.volume
+          }, OI: ${put.openInterest}, IV: ${put.impliedVolatility.toFixed(
+            2
+          )}, In-The-Money: ${put.inTheMoney}`
+      )
+      .join('\n');
+
+    // Provide summary statistics instead of listing all strikes
+    const avgCallIV = (
+      callsSummary.reduce((acc, call) => acc + call.impliedVolatility, 0) /
+      callsSummary.length
+    ).toFixed(2);
+    const avgPutIV = (
+      putsSummary.reduce((acc, put) => acc + put.impliedVolatility, 0) /
+      putsSummary.length
+    ).toFixed(2);
+
     return `
       Expiration Date: ${expirationDate}
-      Strikes Available: ${strikes.join(', ')}
+      Total Strikes Available: ${strikes.length}
       Put-Call Ratio: ${putCallRatio.toFixed(2)}
+      Average Call IV: ${avgCallIV}
+      Average Put IV: ${avgPutIV}
       
-      Calls Summary:
-      ${callsSummary
-        .map(
-          (call) =>
-            `Strike: ${call.strike}, Last Price: ${call.lastPrice}, Volume: ${
-              call.volume
-            }, OI: ${call.openInterest}, IV: ${call.impliedVolatility.toFixed(
-              2
-            )}, In-The-Money: ${call.inTheMoney}`
-        )
-        .join('\n')}
+      Top 3 Calls:
+      ${topCalls}
 
-      Puts Summary:
-      ${putsSummary
-        .map(
-          (put) =>
-            `Strike: ${put.strike}, Last Price: ${put.lastPrice}, Volume: ${
-              put.volume
-            }, OI: ${put.openInterest}, IV: ${put.impliedVolatility.toFixed(
-              2
-            )}, In-The-Money: ${put.inTheMoney}`
-        )
-        .join('\n')}
+      Top 3 Puts:
+      ${topPuts}
     `;
   });
-
-  // Generate a text representation of all expiration dates available
-  const expirationDatesText = `Available Expiration Dates: ${expirationDates.join(
-    ', '
-  )}`;
 
   // Combine all the parts into a single LLM input text
   return `${expirationDatesText}\n\n${summaries.join('\n\n')}`;

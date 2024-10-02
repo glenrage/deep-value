@@ -20,18 +20,7 @@ const fetchAdditionalStockData = async (ticker) => {
     modules: ['summaryDetail', 'defaultKeyStatistics'],
   });
 
-  const marketCap = quoteSummary.summaryDetail.marketCap;
-  const beta = quoteSummary.defaultKeyStatistics.beta;
-  const sharesOutstanding = quoteSummary.defaultKeyStatistics.sharesOutstanding;
-  const currentPrice = quoteSummary.summaryDetail.previousClose;
-
-  return {
-    currentPrice,
-    marketCap,
-    beta,
-    sharesOutstanding,
-    keyStats: quoteSummary,
-  };
+  return quoteSummary;
 };
 
 const fetchStockData = async (ticker) => {

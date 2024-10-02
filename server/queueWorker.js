@@ -35,7 +35,7 @@ if (process.env.NODE_ENV === 'production') {
 const embeddingWorker = new Worker(
   'embeddingQueue',
   async (job) => {
-    console.log(`Processing embedding job for: ${job.id}`); // Add this log to verify if the worker receives the job
+    // console.log(`Processing embedding job for: ${job.id}`); // Add this log to verify if the worker receives the job
 
     const { embedding, metadata } = job.data;
     try {
@@ -49,9 +49,10 @@ const embeddingWorker = new Worker(
         existingEmbedding &&
         Object.keys(existingEmbedding.records).length > 0
       ) {
-        console.log(
-          `Embedding for ${metadata.title} already exists in Pinecone. Skipping insertion.`
-        );
+        console
+          .log
+          // `Embedding for ${metadata.title} already exists in Pinecone. Skipping insertion.`
+          ();
         return;
       }
 
@@ -70,7 +71,7 @@ const embeddingWorker = new Worker(
         },
       ]);
 
-      console.log(`Stored embedding for article: ${metadata.title}`);
+      // console.log(`Stored embedding for article: ${metadata.title}`);
     } catch (error) {
       console.error('Error storing embedding in Pinecone:', error);
       throw error;
@@ -82,9 +83,9 @@ const embeddingWorker = new Worker(
 );
 
 embeddingWorker.on('completed', (job) => {
-  console.log(`Embedding job completed for: ${job.id}`);
+  // console.log(`Embedding job completed for: ${job.id}`);
 });
 
 embeddingWorker.on('failed', (job, err) => {
-  console.error(`Embedding job failed for: ${job.id}`, err);
+  // console.error(`Embedding job failed for: ${job.id}`, err);
 });

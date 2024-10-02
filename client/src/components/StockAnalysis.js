@@ -1,26 +1,25 @@
 import React, { useState } from 'react';
 import { Card, Spinner, Button, TextInput } from 'flowbite-react';
 import { fetchFullStockAnalysis } from '../utils/queries';
-import { mockData } from '../mock';
 
 const StockAnalysis = () => {
   const [ticker, setTicker] = useState('');
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState(null);
 
-  const [analysisData, setAnalysisData] = useState(mockData);
-
-  // const [analysisData, setAnalysisData] = useState({
-  //   dcfAnalysis: { data: null, loading: true },
-  //   aiExplanation: { data: null, loading: true },
-  //   sentimentAnalysis: { data: null, loading: true },
-  //   technicalAnalysis: { data: null, loading: true },
-  //   insiderSentiment: { data: null, loading: true },
-  //   optionsChainAnalysis: { data: null, loading: true },
-  //   comprehensiveAnalysis: { data: null, loading: true },
-  // });
+  const [analysisData, setAnalysisData] = useState({
+    dcfAnalysis: { data: null, loading: false },
+    aiExplanation: { data: null, loading: false },
+    sentimentAnalysis: { data: null, loading: false },
+    technicalAnalysis: { data: null, loading: false },
+    insiderSentiment: { data: null, loading: false },
+    optionsChainAnalysis: { data: null, loading: false },
+    comprehensiveAnalysis: { data: null, loading: false },
+  });
 
   const handleFetchAnalysis = () => {
+    if (!ticker) return;
+
     setFetching(true);
     setError(null);
 
@@ -34,6 +33,28 @@ const StockAnalysis = () => {
       optionsChainAnalysis: { data: null, loading: true },
       comprehensiveAnalysis: { data: null, loading: true },
     });
+
+    const onMessage = (data) => {
+      if (data.type === 'complete') {
+        setFetching(false);
+      } else if (data.type === 'error') {
+        setFetching(false);
+        setError(data.message);
+      } else {
+        setAnalysisData((prevData) => ({
+          ...prevData,
+          [data.type]: { data: data.data, loading: false },
+        }));
+      }
+    };
+
+    const onError = (error) => {
+      setFetching(false);
+      setError('Error fetching stock analysis data');
+    };
+
+    // Initiate fetching with the EventSource
+    fetchFullStockAnalysis(ticker, onMessage, onError);
   };
 
   const AnalysisCard = ({ title, data, loading }) => (
@@ -97,15 +118,15 @@ const StockAnalysis = () => {
                   ${data.bestCase.toFixed(2)}
                 </span>
               </div>
-              <div className="flex flex-wrap  items-center">
+              <div className="flex flex-wrap items-center">
                 <span className="font-semibold text-blue-700">
                   Average Case:
                 </span>
-                <span className="ml-2 text-gray-700 items-center">
+                <span className="ml-2 text-gray-700">
                   ${data.averageCase.toFixed(2)}
                 </span>
               </div>
-              <div className="flex flex-wrap ">
+              <div className="flex flex-wrap">
                 <span className="font-semibold text-blue-700">Worst Case:</span>
                 <span className="ml-2 text-gray-700">
                   ${data.worstCase.toFixed(2)}
@@ -134,56 +155,65 @@ const StockAnalysis = () => {
         </div>
       ) : (
         <div className="mt-2 h-full overflow-y-auto pr-2">
-          <div className="flex flex-wrap mb-1 items-center">
-            <span className="font-semibold text-blue-700">
-              Overall Sentiment:
-            </span>
-            <span className="ml-2 text-gray-700">{data.overallSentiment}</span>
-          </div>
-
-          <div className="flex flex-wrap mb-1">
-            <span className="font-semibold text-blue-700">
-              Positive Articles:
-            </span>
-            <span className="ml-2 text-gray-700">
-              {data.sentimentBreakdown.positive}
-            </span>
-          </div>
-          <div className="flex flex-wrap mb-1">
-            <span className="font-semibold text-blue-700">
-              Neutral Articles:
-            </span>
-            <span className="ml-2 text-gray-700">
-              {data.sentimentBreakdown.neutral}
-            </span>
-          </div>
-          <div className="flex flex-wrap mb-1">
-            <span className="font-semibold text-blue-700">
-              Negative Articles:
-            </span>
-            <span className="ml-2 text-gray-700">
-              {data.sentimentBreakdown.negative}
-            </span>
-          </div>
-
-          <h6 className="text-md font-semibold mt-4 mb-2 text-blue-700">
-            Articles Summary:
-          </h6>
-          <div className="overflow-y-auto w-full max-h-40 pr-1">
-            {data.articles.map((article, index) => (
-              <div key={index} className="mb-3 border-b pb-2 border-gray-200">
-                <p className="text-sm font-semibold text-gray-800">
-                  {article.title}
-                </p>
-                <p className="text-xs text-gray-600">
-                  Source: {article.source} | Author: {article.author}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {article.sentiment}
-                </p>
+          {data ? (
+            <>
+              <div className="flex flex-wrap mb-1 items-center">
+                <span className="font-semibold text-blue-700">
+                  Overall Sentiment:
+                </span>
+                <span className="ml-2 text-gray-700">
+                  {data.overallSentiment}
+                </span>
               </div>
-            ))}
-          </div>
+              <div className="flex flex-wrap mb-1">
+                <span className="font-semibold text-blue-700">
+                  Positive Articles:
+                </span>
+                <span className="ml-2 text-gray-700">
+                  {data.sentimentBreakdown.positive}
+                </span>
+              </div>
+              <div className="flex flex-wrap mb-1">
+                <span className="font-semibold text-blue-700">
+                  Neutral Articles:
+                </span>
+                <span className="ml-2 text-gray-700">
+                  {data.sentimentBreakdown.neutral}
+                </span>
+              </div>
+              <div className="flex flex-wrap mb-1">
+                <span className="font-semibold text-blue-700">
+                  Negative Articles:
+                </span>
+                <span className="ml-2 text-gray-700">
+                  {data.sentimentBreakdown.negative}
+                </span>
+              </div>
+              <h6 className="text-md font-semibold mt-4 mb-2 text-blue-700">
+                Articles Summary:
+              </h6>
+              <div className="overflow-y-auto w-full max-h-40 pr-1">
+                {data.articles.map((article, index) => (
+                  <div
+                    key={index}
+                    className="mb-3 border-b pb-2 border-gray-200"
+                  >
+                    <p className="text-sm font-semibold text-gray-800">
+                      {article.title}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      Source: {article.source} | Author: {article.author}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {article.sentiment}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-gray-500">No data available</p>
+          )}
         </div>
       )}
     </Card>
@@ -203,14 +233,18 @@ const StockAnalysis = () => {
         </div>
       ) : (
         <div className="h-full overflow-y-auto pr-2">
-          {Object.entries(data).map(([key, value]) => (
-            <div key={key} className="mb-4">
-              <h6 className="text-md font-semibold text-blue-700 capitalize mb-1">
-                {key.replace(/([A-Z])/g, ' $1')}
-              </h6>
-              <p className="text-sm text-gray-700">{value}</p>
-            </div>
-          ))}
+          {data ? (
+            Object.entries(data).map(([key, value]) => (
+              <div key={key} className="mb-4">
+                <h6 className="text-md font-semibold text-blue-700 capitalize mb-1">
+                  {key.replace(/([A-Z])/g, ' $1')}
+                </h6>
+                <p className="text-sm text-gray-700">{value}</p>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-gray-500">No data available</p>
+          )}
         </div>
       )}
     </Card>
@@ -255,6 +289,11 @@ const StockAnalysis = () => {
           data={analysisData.aiExplanation.data}
           loading={analysisData.aiExplanation.loading}
         />
+        <ComprehensiveAnalysisCard
+          title="Comprehensive Analysis"
+          data={analysisData.comprehensiveAnalysis.data}
+          loading={analysisData.comprehensiveAnalysis.loading}
+        />
         <SentimentAnalysisCard
           title="News & Analyst Sentiment Analysis"
           data={analysisData.sentimentAnalysis.data}
@@ -274,11 +313,6 @@ const StockAnalysis = () => {
           title="Options Chain Analysis"
           data={analysisData.optionsChainAnalysis.data}
           loading={analysisData.optionsChainAnalysis.loading}
-        />
-        <ComprehensiveAnalysisCard
-          title="Comprehensive Analysis"
-          data={analysisData.comprehensiveAnalysis.data}
-          loading={analysisData.comprehensiveAnalysis.loading}
         />
       </div>
     </div>
