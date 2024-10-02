@@ -73,10 +73,27 @@ const fetchStockNewsArticles = async (ticker) => {
   return news;
 };
 
+const fetchOptionsData = async (symbol, date) => {
+  const optionsData = await yahooFinance.options(symbol);
+  const nearestExpirationDate = optionsData.expirationDates[0]; // Use the nearest expiration date
+
+  const queryOptions = {
+    lang: 'en-US',
+    formatted: false,
+    region: 'US',
+    date: nearestExpirationDate,
+  };
+
+  const optionsDataWithDate = await yahooFinance.options(symbol, queryOptions);
+
+  return optionsDataWithDate;
+};
+
 module.exports = {
   fetchStockData,
   fetchAdditionalStockData,
   fetchInsiderSentiment,
   fetchHistoricalData,
   fetchStockNewsArticles,
+  fetchOptionsData,
 };

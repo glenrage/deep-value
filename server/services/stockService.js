@@ -3,6 +3,7 @@ const {
   fetchAdditionalStockData,
   fetchInsiderSentiment,
   fetchHistoricalData,
+  fetchOptionsData,
 } = require('../utils/queries');
 
 const { calculateTechnicalIndicators } = require('../utils/calculations');
@@ -10,6 +11,8 @@ const { calculateTechnicalIndicators } = require('../utils/calculations');
 const {
   extractFinnhubReports,
   calculateTerminalGrowthRate,
+  processOptionsData,
+  generateLLMInputText,
 } = require('../utils/helpers');
 
 const getInsiderSentiment = async (ticker) => {
@@ -53,6 +56,23 @@ const getTechincalAnalysisData = async (ticker) => {
       error.message
     );
     throw new Error('Failed to fetch historical stock data');
+  }
+};
+
+const getOptionsData = async (ticker, date) => {
+  try {
+    const optionsData = await fetchOptionsData(ticker, date);
+    const formattedData = processOptionsData(optionsData);
+
+    const llmInputText = generateLLMInputText(formattedData);
+
+    return llmInputText;
+  } catch (error) {
+    console.error(
+      `Error fetching options data for ${ticker} on ${date}:`,
+      error.message
+    );
+    throw new Error('Failed to fetch options data');
   }
 };
 
@@ -337,10 +357,6 @@ function calculateWACC(data, additionalData) {
   return wacc;
 }
 
-/**
- * Helper function to calculate the terminal growth rate based on historical revenue growth.
- */
-
 module.exports = {
   calculateDCFAllScenarios,
   prepareDCFInputs,
@@ -348,4 +364,5 @@ module.exports = {
   getAdditionalStockData,
   getInsiderSentiment,
   getTechincalAnalysisData,
+  getOptionsData,
 };

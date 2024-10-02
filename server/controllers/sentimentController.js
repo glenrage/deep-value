@@ -45,8 +45,15 @@ const fetchStockData = async (ticker) => {
     const additionalData = await stockService.getAdditionalStockData(ticker);
     const technicalData = await stockService.getTechincalAnalysisData(ticker);
     const insiderSentiment = await stockService.getInsiderSentiment(ticker);
+    const optionsChainText = await stockService.getOptionsData(ticker);
 
-    return { ...stockData, additionalData, technicalData, insiderSentiment };
+    return {
+      ...stockData,
+      additionalData,
+      technicalData,
+      insiderSentiment,
+      optionsChainText,
+    };
   } catch (error) {
     console.error(`Error fetching stock data for ticker: ${ticker}`, error);
     throw new Error('Failed to fetch stock data');
@@ -90,6 +97,16 @@ const generateAItechnicalExplanation = async (data, ticker) => {
   } catch (error) {
     console.error('Error generating technical AI explanation', error);
     throw new Error('Failed to generate technical AI explanation');
+  }
+};
+
+// Utility function to analyze options chain using AI
+const generateAIOptionsChainExplanation = async (optionsChainText) => {
+  try {
+    return await aiService.getOptionsChainExplanation(optionsChainText);
+  } catch (error) {
+    console.error('Error generating AI options chain explanation', error);
+    throw new Error('Failed to generate AI options chain explanation');
   }
 };
 
@@ -218,6 +235,13 @@ const getFullStockAnalysis = async (req, res) => {
     );
     res.write(
       `data: ${JSON.stringify({ type: 'technicalAnalysis', data: aiTAexplanation })}\n\n`
+    );
+
+    const optionsChainExplanation = await generateAIOptionsChainExplanation(
+      stockData.optionsChainText
+    );
+    res.write(
+      `data: ${JSON.stringify({ type: 'optionsChainAnalysis', data: optionsChainExplanation })}\n\n`
     );
 
     const insiderSentiment = await analyzeInsiderSentiment(

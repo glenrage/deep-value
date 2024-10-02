@@ -137,6 +137,88 @@ const sanitizeId = (id) => {
   return id.replace(/[^\x00-\x7F]/g, '_');
 };
 
+// Helper function to process and format options data
+const processOptionsData = (optionsData) => {
+  const { expirationDates, strikes, options } = optionsData;
+
+  const formattedData = options.map((optionChain) => {
+    const { expirationDate, calls, puts } = optionChain;
+
+    // Summarize the key metrics of calls and puts for the given expiration date
+    const callsSummary = calls.map((call) => ({
+      strike: call.strike,
+      lastPrice: call.lastPrice,
+      volume: call.volume,
+      openInterest: call.openInterest,
+      impliedVolatility: call.impliedVolatility,
+      inTheMoney: call.inTheMoney,
+    }));
+
+    const putsSummary = puts.map((put) => ({
+      strike: put.strike,
+      lastPrice: put.lastPrice,
+      volume: put.volume,
+      openInterest: put.openInterest,
+      impliedVolatility: put.impliedVolatility,
+      inTheMoney: put.inTheMoney,
+    }));
+
+    // Aggregate the data into a simpler structure for LLM processing
+    return {
+      expirationDate: expirationDate.toISOString(),
+      strikes,
+      callsSummary,
+      putsSummary,
+      putCallRatio: puts.length / (calls.length || 1), // Prevent division by zero
+    };
+  });
+
+  return {
+    expirationDates: expirationDates.map((date) => date.toISOString()),
+    formattedData,
+  };
+};
+
+// Helper function to create input text for LLM from formatted options data
+const generateLLMInputText = (formattedOptionsData) => {
+  const { expirationDates, formattedData } = formattedOptionsData;
+
+  // Generate summaries for each expiration date in formattedData
+  const summaries = formattedData.map((optionChain) => {
+    const { expirationDate, callsSummary, putsSummary, putCallRatio, strikes } =
+      optionChain;
+
+    // Generate a simple textual representation for each expiration date
+    return `
+      Expiration Date: ${expirationDate}
+      Strikes Available: ${strikes.join(', ')}
+      Put-Call Ratio: ${putCallRatio.toFixed(2)}
+      
+      Calls Summary:
+      ${callsSummary
+        .map(
+          (call) =>
+            `Strike: ${call.strike}, Last Price: ${call.lastPrice}, Volume: ${call.volume}, OI: ${call.openInterest}, IV: ${call.impliedVolatility.toFixed(2)}, In-The-Money: ${call.inTheMoney}`
+        )
+        .join('\n')}
+
+      Puts Summary:
+      ${putsSummary
+        .map(
+          (put) =>
+            `Strike: ${put.strike}, Last Price: ${put.lastPrice}, Volume: ${put.volume}, OI: ${put.openInterest}, IV: ${put.impliedVolatility.toFixed(2)}, In-The-Money: ${put.inTheMoney}`
+        )
+        .join('\n')}
+    `;
+  });
+
+  // Generate a text representation of all expiration dates available
+  const expirationDatesText = `Available Expiration Dates: ${expirationDates.join(', ')}`;
+
+  // Combine all the parts into a single LLM input text
+  return `${expirationDatesText}\n\n${summaries.join('\n\n')}`;
+};
+
 module.exports = {
   calculateTerminalGrowthRate,
   formatNewsDataForSentiment,
@@ -146,4 +228,6 @@ module.exports = {
   extractFinnhubReports,
   reduceEmbeddingToMatchIndex,
   sanitizeId,
+  processOptionsData,
+  generateLLMInputText,
 };

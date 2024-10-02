@@ -141,7 +141,52 @@ const getTAExplanation = async (technicalData, ticker) => {
   }
 };
 
+const getOptionsChainExplanation = async (optionsChainText) => {
+  const messageContent = `
+  You are a financial expert specializing in options trading and sentiment analysis. 
+  Please analyze the following options chain data and provide insights on market sentiment, 
+  potential unusual volume, and overall investor expectations.
+  
+  Options Chain Data:
+  
+  ${optionsChainText}
+  
+  Consider the following questions in your analysis:
+  - What does the put-call ratio suggest about investor sentiment (e.g., bullish or bearish)?
+  - Are there any strikes with unusually high volume or open interest that might indicate significant investor activity?
+  - Based on implied volatility, what are investors' expectations for future price movements?
+  - Is there evidence of institutional hedging or speculative behavior?
+  
+  Please provide a detailed analysis in simple terms to maximize profit
+  `;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are a financial expert specializing in options trading and sentiment analysis.',
+        },
+        {
+          role: 'user',
+          content: messageContent,
+        },
+      ],
+    });
+
+    const optionsChainExplanation = response.choices[0].message.content;
+
+    return optionsChainExplanation;
+  } catch (error) {
+    console.error('Error analyzing options chain:', error);
+    throw new Error('Failed to analyze options chain');
+  }
+};
+
 module.exports = {
   getStockExplanation,
   getTAExplanation,
+  getOptionsChainExplanation,
 };

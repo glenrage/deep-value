@@ -1,5 +1,4 @@
 const stockService = require('../services/stockService');
-const { NVDA_MOCK } = require('../mocks');
 
 const getMockStockData = (req, res) => {
   const data = stockService.getMockStockData();
@@ -13,6 +12,7 @@ const getStockDataAndCalculateDCF = async (req, res) => {
   const insiderData = await stockService.getInsiderSentiment(ticker);
   const additionalData = await stockService.getAdditionalStockData(ticker);
   const historicalData = await stockService.getTechincalAnalysisData(ticker);
+  const optionsData = await stockService.getOptionsData(ticker);
 
   const dcfInputs = stockService.prepareDCFInputs(stockData, additionalData);
 
@@ -38,6 +38,7 @@ const getStockDataAndCalculateDCF = async (req, res) => {
     dcfResult,
     historicalData,
     insiderData,
+    optionsData,
   });
 };
 
