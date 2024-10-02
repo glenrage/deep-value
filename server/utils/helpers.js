@@ -198,7 +198,11 @@ const generateLLMInputText = (formattedOptionsData) => {
       ${callsSummary
         .map(
           (call) =>
-            `Strike: ${call.strike}, Last Price: ${call.lastPrice}, Volume: ${call.volume}, OI: ${call.openInterest}, IV: ${call.impliedVolatility.toFixed(2)}, In-The-Money: ${call.inTheMoney}`
+            `Strike: ${call.strike}, Last Price: ${call.lastPrice}, Volume: ${
+              call.volume
+            }, OI: ${call.openInterest}, IV: ${call.impliedVolatility.toFixed(
+              2
+            )}, In-The-Money: ${call.inTheMoney}`
         )
         .join('\n')}
 
@@ -206,14 +210,20 @@ const generateLLMInputText = (formattedOptionsData) => {
       ${putsSummary
         .map(
           (put) =>
-            `Strike: ${put.strike}, Last Price: ${put.lastPrice}, Volume: ${put.volume}, OI: ${put.openInterest}, IV: ${put.impliedVolatility.toFixed(2)}, In-The-Money: ${put.inTheMoney}`
+            `Strike: ${put.strike}, Last Price: ${put.lastPrice}, Volume: ${
+              put.volume
+            }, OI: ${put.openInterest}, IV: ${put.impliedVolatility.toFixed(
+              2
+            )}, In-The-Money: ${put.inTheMoney}`
         )
         .join('\n')}
     `;
   });
 
   // Generate a text representation of all expiration dates available
-  const expirationDatesText = `Available Expiration Dates: ${expirationDates.join(', ')}`;
+  const expirationDatesText = `Available Expiration Dates: ${expirationDates.join(
+    ', '
+  )}`;
 
   // Combine all the parts into a single LLM input text
   return `${expirationDatesText}\n\n${summaries.join('\n\n')}`;

@@ -15,6 +15,191 @@ const {
   generateLLMInputText,
 } = require('../utils/helpers');
 
+const yahooFinance = require('yahoo-finance2').default;
+
+// Fetch Yahoo Finance data
+const getYahooFinanceData = async (ticker) => {
+  try {
+    const queryOptions = {
+      modules: [
+        'incomeStatementHistory',
+        'cashflowStatementHistory',
+        'defaultKeyStatistics',
+        'summaryDetail',
+        'financialData',
+      ],
+    };
+    const data = await yahooFinance.quoteSummary(ticker, queryOptions);
+
+    if (!data) {
+      throw new Error('No data available from Yahoo Finance');
+    }
+
+    // Extract income and cash flow statements
+    const incomeStatements =
+      data.incomeStatementHistory?.incomeStatementHistory;
+    const cashFlowStatements =
+      data.cashflowStatementHistory?.cashflowStatements;
+
+    if (
+      !incomeStatements ||
+      incomeStatements.length < 2 ||
+      !cashFlowStatements ||
+      cashFlowStatements.length < 2
+    ) {
+      throw new Error('Insufficient financial data for multiple years');
+    }
+
+    // Helper function to safely get a number or return a default value
+    const safeGetNumber = (value, fieldName, defaultValue = 0) => {
+      if (typeof value === 'number' && !isNaN(value) && value !== 0) {
+        return value;
+      }
+      console.warn(
+        `Warning: Invalid or missing ${fieldName}, using default value.`
+      );
+      return defaultValue;
+    };
+
+    // Prepare income statement data
+    const prepareIncomeStatement = (statement) => ({
+      totalRevenue: safeGetNumber(statement.totalRevenue, 'totalRevenue'),
+      operatingIncome:
+        safeGetNumber(statement.operatingIncome, 'operatingIncome') ||
+        safeGetNumber(statement.totalRevenue, 'totalRevenue') -
+          safeGetNumber(statement.costOfRevenue, 'costOfRevenue', 0) -
+          safeGetNumber(
+            statement.totalOperatingExpenses,
+            'totalOperatingExpenses'
+          ), // Fallback calculation for operating income
+      incomeBeforeTax: safeGetNumber(
+        statement.incomeBeforeTax,
+        'incomeBeforeTax'
+      ),
+      interestExpense: safeGetNumber(
+        statement.interestExpense,
+        'interestExpense'
+      ),
+      incomeTaxExpense: safeGetNumber(
+        statement.incomeTaxExpense,
+        'incomeTaxExpense'
+      ),
+    });
+
+    // Prepare cash flow statement data with approximation if missing
+    const prepareCashFlowStatement = (statement) => {
+      const operatingCashflow = safeGetNumber(
+        statement.totalCashFromOperatingActivities,
+        'totalCashFromOperatingActivities'
+      );
+      const capitalExpenditures = safeGetNumber(
+        statement.capitalExpenditures,
+        'capitalExpenditures'
+      );
+
+      // If operating cashflow is missing, approximate it using net income (assumption-based approximation)
+      if (operatingCashflow === 0) {
+        const netIncome = safeGetNumber(statement.netIncome, 'netIncome');
+        return {
+          operatingCashflow: netIncome * 1.2, // Assuming operating cashflow is roughly 20% higher than net income
+          capitalExpenditures,
+        };
+      }
+
+      return {
+        operatingCashflow,
+        capitalExpenditures,
+      };
+    };
+
+    // Format income statement and cash flow statement
+    const formattedIncomeStatement = {
+      annualReports: [
+        prepareIncomeStatement(incomeStatements[0]),
+        prepareIncomeStatement(incomeStatements[1]),
+      ],
+    };
+
+    const formattedCashFlowStatement = {
+      annualReports: [
+        prepareCashFlowStatement(cashFlowStatements[0]),
+        prepareCashFlowStatement(cashFlowStatements[1]),
+      ],
+    };
+
+    // Extract additional data
+    const marketCap = safeGetNumber(data.summaryDetail?.marketCap, 'marketCap');
+    const beta = safeGetNumber(data.defaultKeyStatistics?.beta, 'beta', 1);
+    const sharesOutstanding = safeGetNumber(
+      data.defaultKeyStatistics?.sharesOutstanding,
+      'sharesOutstanding'
+    );
+
+    // Calculate free cash flow (Operating Cash Flow - Capital Expenditures)
+    const freeCashFlow =
+      formattedCashFlowStatement.annualReports[0].operatingCashflow !== null &&
+      formattedCashFlowStatement.annualReports[0].capitalExpenditures !== null
+        ? formattedCashFlowStatement.annualReports[0].operatingCashflow -
+          formattedCashFlowStatement.annualReports[0].capitalExpenditures
+        : null;
+
+    // Calculate revenue growth rate (Current Revenue / Previous Year Revenue - 1)
+    const revenueGrowthRate =
+      formattedIncomeStatement.annualReports[0].totalRevenue !== null &&
+      formattedIncomeStatement.annualReports[1].totalRevenue !== null &&
+      formattedIncomeStatement.annualReports[1].totalRevenue !== 0
+        ? formattedIncomeStatement.annualReports[0].totalRevenue /
+            formattedIncomeStatement.annualReports[1].totalRevenue -
+          1
+        : 0.05; // Default growth rate if data is missing
+
+    // Calculate discount rate using CAPM (risk-free rate + beta * equity risk premium)
+    const riskFreeRate = safeGetNumber(
+      data.financialData?.riskFreeRate,
+      'riskFreeRate',
+      0.03
+    );
+    const equityRiskPremium = 0.05; // Typically 4-6%
+    const discountRate = riskFreeRate + beta * equityRiskPremium;
+
+    // Calculate terminal growth rate (typically 2-4%, use half of revenue growth rate if available)
+    const terminalGrowthRate =
+      revenueGrowthRate !== null ? Math.min(revenueGrowthRate / 2, 0.04) : 0.02;
+
+    return {
+      data: {
+        incomeStatement: formattedIncomeStatement,
+        cashFlow: formattedCashFlowStatement,
+      },
+      ticker,
+      revenue: formattedIncomeStatement.annualReports[0].totalRevenue,
+      operatingIncome:
+        formattedIncomeStatement.annualReports[0].operatingIncome,
+      freeCashFlow,
+      additionalData: {
+        marketCap,
+        beta,
+        sharesOutstanding,
+      },
+      dcfInputs: {
+        freeCashFlow, // Used for calculating future free cash flows in DCF
+        growthRate: revenueGrowthRate, // Estimated revenue growth rate
+        discountRate, // Discount rate calculated using CAPM
+        terminalGrowthRate, // Terminal growth rate for calculating terminal value
+        sharesOutstanding, // Number of shares outstanding for intrinsic value per share calculation
+      },
+    };
+  } catch (error) {
+    console.error(
+      `Error fetching Yahoo Finance data for ${ticker}:`,
+      error.message
+    );
+    throw new Error(
+      `Unable to fetch stock data from Yahoo Finance: ${error.message}`
+    );
+  }
+};
+
 const getInsiderSentiment = async (ticker) => {
   try {
     return await fetchInsiderSentiment(ticker);
@@ -73,94 +258,6 @@ const getOptionsData = async (ticker, date) => {
       error.message
     );
     throw new Error('Failed to fetch options data');
-  }
-};
-
-const getStockData = async (ticker) => {
-  try {
-    const financialsData = await fetchStockData(ticker);
-
-    if (!financialsData || financialsData.length === 0) {
-      throw new Error('No financial data available');
-    }
-
-    // Extract annual financial reports
-    const annualReports = financialsData.filter(
-      (report) => report.form === '10-K'
-    );
-    if (annualReports.length < 2) {
-      throw new Error('Insufficient financial data for multiple years');
-    }
-
-    // Extract income statement and cash flow for the two most recent years
-
-    const mostRecentReport = extractFinnhubReports(annualReports[0]);
-    const previousReport = extractFinnhubReports(annualReports[1]);
-
-    // Check if any critical data is missing
-    if (!mostRecentReport || !previousReport) {
-      throw new Error('Critical financial data is missing');
-    }
-
-    // Calculate free cash flow (FCF) for both years
-    const freeCashFlow =
-      mostRecentReport.netCashProvidedByOperatingActivities &&
-      mostRecentReport.capitalExpenditures
-        ? mostRecentReport.netCashProvidedByOperatingActivities -
-          mostRecentReport.capitalExpenditures
-        : null;
-
-    if (freeCashFlow === null) {
-      console.warn('Free Cash Flow data is missing, using default value of 0');
-    }
-
-    const formattedIncomeStatement = {
-      annualReports: [
-        {
-          totalRevenue: mostRecentReport.revenue ?? 0,
-          operatingIncome: mostRecentReport.operatingIncome ?? 0,
-          incomeBeforeTax: mostRecentReport.incomeBeforeTax ?? 0,
-          interestExpense: mostRecentReport.interestExpense ?? 0,
-          incomeTaxExpense: mostRecentReport.incomeTaxExpense ?? 0,
-        },
-        {
-          totalRevenue: previousReport.revenue ?? 0,
-          operatingIncome: previousReport.operatingIncome ?? 0,
-          incomeBeforeTax: previousReport.incomeBeforeTax ?? 0,
-          interestExpense: previousReport.interestExpense ?? 0,
-          incomeTaxExpense: previousReport.incomeTaxExpense ?? 0,
-        },
-      ],
-    };
-
-    const formattedCashFlowStatement = {
-      annualReports: [
-        {
-          operatingCashflow:
-            mostRecentReport.netCashProvidedByOperatingActivities ?? 0,
-          capitalExpenditures: mostRecentReport.capitalExpenditures ?? 0,
-        },
-        {
-          operatingCashflow:
-            previousReport.netCashProvidedByOperatingActivities ?? 0,
-          capitalExpenditures: previousReport.capitalExpenditures ?? 0,
-        },
-      ],
-    };
-
-    return {
-      data: {
-        incomeStatement: formattedIncomeStatement,
-        cashFlow: formattedCashFlowStatement,
-      },
-      ticker,
-      revenue: mostRecentReport.revenue ?? 0,
-      operatingIncome: mostRecentReport.operatingIncome ?? 0,
-      freeCashFlow: freeCashFlow ?? 0,
-    };
-  } catch (error) {
-    console.error('Error fetching stock data from Finnhub:', error.message);
-    throw new Error('Unable to fetch stock data');
   }
 };
 
@@ -358,9 +455,9 @@ function calculateWACC(data, additionalData) {
 }
 
 module.exports = {
+  getYahooFinanceData,
   calculateDCFAllScenarios,
   prepareDCFInputs,
-  getStockData,
   getAdditionalStockData,
   getInsiderSentiment,
   getTechincalAnalysisData,

@@ -31,7 +31,10 @@ const createStockAnalysisParser = () => {
     fundamentalAnalysis: "A summary of the stock's fundamental analysis",
     sentimentOverview: 'An overview of the current market sentiment',
     riskAssessment: 'An assessment of potential risks',
-    investmentRecommendation: 'A concise investment recommendation',
+    optionsAnalysis:
+      'An analysis of the options chain and implied market sentiment',
+    investmentRecommendation:
+      'A concise investment recommendation, buy or sell short or long term',
   });
 };
 
@@ -42,6 +45,7 @@ const createComprehensiveStockAnalysisChain = (parser) => {
       'Technical Data: {technicalData}\n' +
       'Financial Data: {financialData}\n' +
       'Market Sentiment: {marketSentiment}\n' +
+      'Options Chain Analysis: {optionsAnalysis}\n' +
       'Recent News: {recentNews}\n\n' +
       'Please structure your response as follows:\n' +
       '{format_instructions}'
@@ -74,7 +78,7 @@ const prompts = {
 // Utility function to fetch stock data
 const fetchStockData = async (ticker) => {
   try {
-    const stockData = await stockService.getStockData(ticker);
+    const stockData = await stockService.getYahooFinanceData(ticker);
     const additionalData = await stockService.getAdditionalStockData(ticker);
     const technicalData = await stockService.getTechincalAnalysisData(ticker);
     const insiderSentiment = await stockService.getInsiderSentiment(ticker);
@@ -249,6 +253,7 @@ const getFullStockAnalysis = async (req, res) => {
       technicalData: JSON.stringify(stockData.technicalData),
       financialData: JSON.stringify(stockData.additionalData),
       marketSentiment: JSON.stringify(sentimentResults),
+      optionsAnalysis: JSON.stringify(optionsChainExplanation),
       recentNews: JSON.stringify(stockData.recentNews),
       format_instructions: parser.getFormatInstructions(),
     });
