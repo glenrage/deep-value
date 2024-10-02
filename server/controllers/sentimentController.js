@@ -78,7 +78,7 @@ const prompts = {
 // Utility function to fetch stock data
 const fetchStockData = async (ticker) => {
   try {
-    const stockData = await stockService.getYahooFinanceData(ticker);
+    const stockData = await stockService.getFMPStockData(ticker);
     const additionalData = await stockService.getAdditionalStockData(ticker);
     const technicalData = await stockService.getTechincalAnalysisData(ticker);
     const insiderSentiment = await stockService.getInsiderSentiment(ticker);

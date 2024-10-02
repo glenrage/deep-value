@@ -1,21 +1,184 @@
+const yahooFinance = require('yahoo-finance2').default;
+
 const {
-  fetchStockData,
   fetchAdditionalStockData,
   fetchInsiderSentiment,
   fetchHistoricalData,
   fetchOptionsData,
+  fetchFMPStockData,
 } = require('../utils/queries');
 
 const { calculateTechnicalIndicators } = require('../utils/calculations');
 
 const {
-  extractFinnhubReports,
   calculateTerminalGrowthRate,
   processOptionsData,
   generateLLMInputText,
 } = require('../utils/helpers');
 
-const yahooFinance = require('yahoo-finance2').default;
+const getFMPStockData = async (ticker) => {
+  try {
+    const response = await fetchFMPStockData(ticker);
+
+    const incomeStatements = response.incomeStatement;
+    const cashFlowStatements = response.cashFlowStatement;
+
+    if (
+      !incomeStatements ||
+      incomeStatements.length < 2 ||
+      !cashFlowStatements ||
+      cashFlowStatements.length < 2
+    ) {
+      throw new Error('Insufficient financial data for multiple years');
+    }
+
+    // Fetch simpler metrics like shares outstanding, market cap, and beta from Yahoo Finance
+    const queryOptions = {
+      modules: ['defaultKeyStatistics', 'summaryDetail'],
+    };
+    const yahooData = await yahooFinance.quoteSummary(ticker, queryOptions);
+
+    if (!yahooData) {
+      throw new Error('No data available from Yahoo Finance');
+    }
+
+    const keyStatistics = yahooData.defaultKeyStatistics;
+    const summaryDetail = yahooData.summaryDetail;
+
+    // Helper function to safely get a number or return a default value
+    const safeGetNumber = (value, fieldName, defaultValue = 0) => {
+      if (typeof value === 'number' && !isNaN(value) && value !== 0) {
+        return value;
+      }
+      console.warn(
+        `Warning: Invalid or missing ${fieldName}, using default value.`
+      );
+      return defaultValue;
+    };
+
+    // Prepare income statement data
+    const prepareIncomeStatement = (statement) => ({
+      totalRevenue: safeGetNumber(statement.revenue, 'totalRevenue'),
+      operatingIncome: safeGetNumber(
+        statement.operatingIncome,
+        'operatingIncome'
+      ),
+      incomeBeforeTax: safeGetNumber(
+        statement.incomeBeforeTax,
+        'incomeBeforeTax'
+      ),
+      interestExpense: safeGetNumber(
+        statement.interestExpense,
+        'interestExpense'
+      ),
+      incomeTaxExpense: safeGetNumber(
+        statement.incomeTaxExpense,
+        'incomeTaxExpense'
+      ),
+    });
+
+    // Prepare cash flow statement data
+    const prepareCashFlowStatement = (statement) => ({
+      operatingCashflow: safeGetNumber(
+        statement.operatingCashFlow,
+        'operatingCashFlow'
+      ),
+      capitalExpenditures: safeGetNumber(
+        statement.capitalExpenditure,
+        'capitalExpenditure'
+      ),
+    });
+
+    // Format income statement and cash flow statement
+    const formattedIncomeStatement = {
+      annualReports: [
+        prepareIncomeStatement(incomeStatements[0]),
+        prepareIncomeStatement(incomeStatements[1]),
+      ],
+    };
+
+    const formattedCashFlowStatement = {
+      annualReports: [
+        prepareCashFlowStatement(cashFlowStatements[0]),
+        prepareCashFlowStatement(cashFlowStatements[1]),
+      ],
+    };
+
+    // Extract additional data from Yahoo Finance
+    const marketCap = safeGetNumber(summaryDetail.marketCap, 'marketCap');
+    const beta = safeGetNumber(keyStatistics.beta, 'beta', 1);
+    const sharesOutstanding = safeGetNumber(
+      keyStatistics.sharesOutstanding,
+      'sharesOutstanding'
+    );
+    const currentPrice = safeGetNumber(
+      summaryDetail.previousClose,
+      'currentPrice'
+    );
+
+    // Calculate free cash flow (Operating Cash Flow - Capital Expenditures)
+    const freeCashFlow =
+      formattedCashFlowStatement.annualReports[0].operatingCashflow !== null &&
+      formattedCashFlowStatement.annualReports[0].capitalExpenditures !== null
+        ? formattedCashFlowStatement.annualReports[0].operatingCashflow -
+          formattedCashFlowStatement.annualReports[0].capitalExpenditures
+        : null;
+
+    // Calculate revenue growth rate (Current Revenue / Previous Year Revenue - 1)
+    const revenueGrowthRate =
+      formattedIncomeStatement.annualReports[0].totalRevenue !== null &&
+      formattedIncomeStatement.annualReports[1].totalRevenue !== null &&
+      formattedIncomeStatement.annualReports[1].totalRevenue !== 0
+        ? formattedIncomeStatement.annualReports[0].totalRevenue /
+            formattedIncomeStatement.annualReports[1].totalRevenue -
+          1
+        : 0.05; // Default growth rate if data is missing
+
+    // Calculate discount rate using CAPM (risk-free rate + beta * equity risk premium)
+    const riskFreeRate = 0.03; // Assuming a default risk-free rate of 3%
+    const equityRiskPremium = 0.05; // Typically 4-6%
+    const discountRate = riskFreeRate + beta * equityRiskPremium;
+
+    // Calculate terminal growth rate (typically 2-4%, use half of revenue growth rate if available)
+    const terminalGrowthRate =
+      revenueGrowthRate !== null ? Math.min(revenueGrowthRate / 2, 0.04) : 0.02;
+
+    return {
+      data: {
+        incomeStatement: formattedIncomeStatement,
+        cashFlow: formattedCashFlowStatement,
+      },
+      ticker,
+      revenue: formattedIncomeStatement.annualReports[0].totalRevenue,
+      operatingIncome:
+        formattedIncomeStatement.annualReports[0].operatingIncome,
+      freeCashFlow,
+      additionalData: {
+        marketCap,
+        beta,
+        sharesOutstanding,
+        currentPrice,
+      },
+      dcfInputs: {
+        freeCashFlow, // Used for calculating future free cash flows in DCF
+        growthRate: revenueGrowthRate, // Estimated revenue growth rate
+        discountRate, // Discount rate calculated using CAPM
+        terminalGrowthRate, // Terminal growth rate for calculating terminal value
+        sharesOutstanding, // Number of shares outstanding for intrinsic value per share calculation
+      },
+      raw: {
+        data: {
+          incomeStatements,
+          cashFlowStatements,
+          keyMetrics: { marketCap, beta, sharesOutstanding },
+        },
+      },
+    };
+  } catch (error) {
+    console.error(`Error fetching data for ${ticker}:`, error.message);
+    throw new Error(`Unable to fetch stock data: ${error.message}`);
+  }
+};
 
 // Fetch Yahoo Finance data
 const getYahooFinanceData = async (ticker) => {
@@ -351,7 +514,7 @@ const calculateDCFAllScenarios = (
 };
 
 // Helper function to extract inputs from the mock data
-const prepareDCFInputs = (data, additionalData) => {
+const prepareDCFInputs = (data) => {
   const annualReport = data.data.incomeStatement.annualReports[0]; // Get the most recent annual report
   const cashFlowReport = data.data.cashFlow.annualReports[0]; // Get the most recent cash flow report
 
@@ -371,13 +534,13 @@ const prepareDCFInputs = (data, additionalData) => {
       : 0.05; // Default growth rate if previousRevenue is 0
 
   // Use WACC (Weighted Average Cost of Capital) from the mock data or calculate from financial reports
-  const wacc = calculateWACC(data, additionalData);
+  const wacc = calculateWACC(data, data.additionalData);
 
   // Estimate terminal growth rate (can be based on past performance or industry standard)
   const terminalGrowthRate = calculateTerminalGrowthRate(data); // Call a helper function for terminal growth rate
 
   // Extract shares outstanding
-  const sharesOutstanding = parseFloat(additionalData.sharesOutstanding);
+  const sharesOutstanding = parseFloat(data.additionalData.sharesOutstanding);
 
   return {
     freeCashFlow,
@@ -392,7 +555,7 @@ const prepareDCFInputs = (data, additionalData) => {
  * Helper function to calculate WACC based on the company's debt, equity, and cost of capital.
  * We use CAPM for cost of equity and calculate cost of debt from the interest expense.
  */
-function calculateWACC(data, additionalData) {
+function calculateWACC(data) {
   // Get the most recent annual report (income statement)
   const annualReport = data.data.incomeStatement.annualReports[0]; // Most recent annual report
   console.log('Most Recent Annual Report:', annualReport);
@@ -410,14 +573,14 @@ function calculateWACC(data, additionalData) {
   const totalDebt = interestExpense / assumedInterestRate;
   console.log('Total Debt:', totalDebt);
 
-  const marketCapitalization = additionalData.marketCap;
+  const marketCapitalization = data.additionalData.marketCap;
   console.log('Market Capitalization:', marketCapitalization);
 
   // Assume cost of equity (Re) calculated from CAPM
   const riskFreeRate = 0.03; // 3% risk-free rate (e.g., US Treasury yield)
   console.log('Risk-Free Rate:', riskFreeRate);
 
-  const beta = additionalData.beta;
+  const beta = data.additionalData.beta;
   console.log('Beta:', beta);
 
   const marketReturn = 0.08; // 8% average market return
@@ -462,4 +625,5 @@ module.exports = {
   getInsiderSentiment,
   getTechincalAnalysisData,
   getOptionsData,
+  getFMPStockData,
 };

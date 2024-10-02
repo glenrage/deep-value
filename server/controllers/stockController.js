@@ -7,14 +7,19 @@ const getMockStockData = (req, res) => {
 
 const getStockDataAndCalculateDCF = async (req, res) => {
   const { ticker } = req.query;
+  let stockData;
 
-  const stockData = await stockService.getYahooFinanceData(ticker);
-  const additionalData = await stockService.getAdditionalStockData(ticker);
+  if (process.env.NODE_ENV === 'development') {
+    stockData = await stockService.getYahooFinanceData(ticker);
+  } else {
+    stockData = await stockService.getFMPStockData(ticker);
+  }
+
   const historicalData = await stockService.getTechincalAnalysisData(ticker);
   const optionsData = await stockService.getOptionsData(ticker);
   const insiderData = await stockService.getInsiderSentiment(ticker);
 
-  const dcfInputs = stockService.prepareDCFInputs(stockData, additionalData);
+  const dcfInputs = stockService.prepareDCFInputs(stockData);
 
   const {
     freeCashFlow,

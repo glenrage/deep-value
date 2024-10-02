@@ -1,9 +1,12 @@
-// Import axios for API requests
 import axios from 'axios';
 
-// Base URL of the backend
-const BASE_URL = 'https://deep-value.onrender.com';
-// const BASE_URL = 'http://localhost:4000';
+let BASE_URL;
+
+if (process.env.NODE_ENV === 'development') {
+  BASE_URL = 'http://localhost:4000';
+} else {
+  BASE_URL = 'https://deep-value.onrender.com';
+}
 
 // Fetch full stock analysis using Server-Sent Events (SSE)
 export const fetchFullStockAnalysis = (ticker, onMessage, onError) => {
