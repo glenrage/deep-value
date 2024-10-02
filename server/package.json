@@ -5,7 +5,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "dev": "concurrently \"nodemon server.js\" \"node queueWorker.js\"",
+    "dev": "concurrently \"redis-server &\" \"nodemon server.js\" \"node queueWorker.js\"",
     "format": "prettier --write ."
   },
   "keywords": [],
