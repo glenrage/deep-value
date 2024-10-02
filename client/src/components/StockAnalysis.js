@@ -37,6 +37,7 @@ const StockAnalysis = () => {
     const onMessage = (data) => {
       if (data.type === 'complete') {
         setFetching(false);
+        setError(null);
       } else if (data.type === 'error') {
         setFetching(false);
         setError(data.message);
@@ -272,11 +273,11 @@ const StockAnalysis = () => {
         </Button>
       </div>
 
-      {error && (
+      {/* {error && (
         <div className="bg-red-100 text-red-700 p-4 rounded mt-4 w-full text-center">
           Error: {error}
         </div>
-      )}
+      )} */}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <DCFAnalysisCard
