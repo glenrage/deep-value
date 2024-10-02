@@ -1,16 +1,54 @@
 const { ChatOpenAI } = require('@langchain/openai');
 const { PromptTemplate } = require('@langchain/core/prompts');
-// const {
-//   createLangChainWorkflow,
-//   executeLangChain,
-// } = require('@langchain/workflow');
+
+const { StructuredOutputParser } = require('langchain/output_parsers');
+const { RunnableSequence } = require('@langchain/core/runnables');
+const { StringOutputParser } = require('@langchain/core/output_parsers');
+
+const { RecursiveCharacterTextSplitter } = require('langchain/text_splitter');
+const { OpenAIEmbeddings } = require('@langchain/openai');
+const { MemoryVectorStore } = require('langchain/vectorstores/memory');
 
 const { HumanMessage } = require('@langchain/core/messages');
 const sentimentService = require('../services/sentimentService');
 const stockService = require('../services/stockService');
 const aiService = require('../services/aiService');
 
-const model = new ChatOpenAI({ model: 'gpt-3.5-turbo-0125', temperature: 0.7 });
+const gpt3Model = new ChatOpenAI({
+  model: 'gpt-3.5-turbo-0125',
+  temperature: 0.7,
+});
+
+const gpt4Model = new ChatOpenAI({
+  model: 'gpt-4-turbo-preview',
+  temperature: 0.2,
+});
+
+// Function to create a structured output parser for stock analysis
+const createStockAnalysisParser = () => {
+  return StructuredOutputParser.fromNamesAndDescriptions({
+    technicalAnalysis: 'A brief technical analysis of the stock',
+    fundamentalAnalysis: "A summary of the stock's fundamental analysis",
+    sentimentOverview: 'An overview of the current market sentiment',
+    riskAssessment: 'An assessment of potential risks',
+    investmentRecommendation: 'A concise investment recommendation',
+  });
+};
+
+// Function to create a chain for comprehensive stock analysis
+const createComprehensiveStockAnalysisChain = (parser) => {
+  const prompt = PromptTemplate.fromTemplate(
+    'Provide a comprehensive analysis of {ticker} stock based on the following data:\n' +
+      'Technical Data: {technicalData}\n' +
+      'Financial Data: {financialData}\n' +
+      'Market Sentiment: {marketSentiment}\n' +
+      'Recent News: {recentNews}\n\n' +
+      'Please structure your response as follows:\n' +
+      '{format_instructions}'
+  );
+
+  return RunnableSequence.from([prompt, gpt4Model, parser]);
+};
 
 const prompts = {
   stockData: PromptTemplate.fromTemplate(
@@ -122,7 +160,7 @@ const analyzeInsiderSentiment = async (ticker, insiderSentiment) => {
       ticker,
       insiderSentiment: JSON.stringify(insiderSentiment),
     });
-    const result = await model.call([new HumanMessage(formattedPrompt)]);
+    const result = await gpt3Model.call([new HumanMessage(formattedPrompt)]);
     return result.content;
   } catch (error) {
     console.error(
@@ -201,6 +239,24 @@ const getFullStockAnalysis = async (req, res) => {
       `data: ${JSON.stringify({
         type: 'insiderSentiment',
         data: insiderSentiment,
+      })}\n\n`
+    );
+
+    const parser = createStockAnalysisParser();
+    const chain = createComprehensiveStockAnalysisChain(parser);
+    const comprehensiveAnalysis = await chain.invoke({
+      ticker,
+      technicalData: JSON.stringify(stockData.technicalData),
+      financialData: JSON.stringify(stockData.additionalData),
+      marketSentiment: JSON.stringify(sentimentResults),
+      recentNews: JSON.stringify(stockData.recentNews),
+      format_instructions: parser.getFormatInstructions(),
+    });
+
+    res.write(
+      `data: ${JSON.stringify({
+        type: 'comprehensiveAnalysis',
+        data: comprehensiveAnalysis,
       })}\n\n`
     );
 

@@ -7,8 +7,10 @@
     "start:server": "npm --prefix server run start",
     "start:client": "npm --prefix client run start",
     "dev:client": "npm --prefix client run dev",
-    "dev:server": "npm --prefix server run dev",
+    "dev:server": "concurrently \"npm --prefix server run dev\" \"redis-server\"",
+    "start": "npm run start:server && npm run start:client",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:redis": "redis-server",
     "lint": "eslint 'client/**/*.{js,jsx,ts,tsx}' 'server/**/*.{js,ts}'",
     "lint:fix": "eslint 'client/**/*.{js,jsx,ts,tsx}' 'server/**/*.{js,ts}' --fix",
     "format": "prettier --write 'client/**/*.{js,jsx,ts,tsx,json,css,scss,md}' 'server/**/*.{js,ts,json}'"
