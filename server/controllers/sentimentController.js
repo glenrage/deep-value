@@ -3,25 +3,19 @@ const { PromptTemplate } = require('@langchain/core/prompts');
 
 const { StructuredOutputParser } = require('langchain/output_parsers');
 const { RunnableSequence } = require('@langchain/core/runnables');
-const { StringOutputParser } = require('@langchain/core/output_parsers');
-
-const { RecursiveCharacterTextSplitter } = require('langchain/text_splitter');
-const { OpenAIEmbeddings } = require('@langchain/openai');
-const { MemoryVectorStore } = require('langchain/vectorstores/memory');
 
 const { HumanMessage } = require('@langchain/core/messages');
 const sentimentService = require('../services/sentimentService');
 const stockService = require('../services/stockService');
 const aiService = require('../services/aiService');
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-const gpt3Model = new ChatOpenAI({
-  model: 'gpt-3.5-turbo-0125',
-  temperature: 0.7,
-});
+const { model } = require('../constants');
 
-const gpt4Model = new ChatOpenAI({
-  model: 'gpt-4-turbo-preview',
+const gptModel = new ChatOpenAI({
+  model: model,
   temperature: 0.2,
+  apiKey: OPENAI_API_KEY,
 });
 
 // Function to create a structured output parser for stock analysis
@@ -51,7 +45,7 @@ const createComprehensiveStockAnalysisChain = (parser) => {
       '{format_instructions}'
   );
 
-  return RunnableSequence.from([prompt, gpt4Model, parser]);
+  return RunnableSequence.from([prompt, gptModel, parser]);
 };
 
 const prompts = {
@@ -78,7 +72,13 @@ const prompts = {
 // Utility function to fetch stock data
 const fetchStockData = async (ticker) => {
   try {
-    const stockData = await stockService.getFMPStockData(ticker);
+    let stockData;
+
+    if (process.env.NODE_ENV === 'development') {
+      stockData = await stockService.getYahooFinanceData(ticker);
+    } else {
+      stockData = await stockService.getFMPStockData(ticker);
+    }
     const additionalData = await stockService.getAdditionalStockData(ticker);
     const technicalData = await stockService.getTechincalAnalysisData(ticker);
     const insiderSentiment = await stockService.getInsiderSentiment(ticker);
@@ -164,7 +164,7 @@ const analyzeInsiderSentiment = async (ticker, insiderSentiment) => {
       ticker,
       insiderSentiment: JSON.stringify(insiderSentiment),
     });
-    const result = await gpt3Model.call([new HumanMessage(formattedPrompt)]);
+    const result = await gptModel.call([new HumanMessage(formattedPrompt)]);
     return result.content;
   } catch (error) {
     console.error(

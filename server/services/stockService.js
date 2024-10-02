@@ -182,6 +182,7 @@ const getFMPStockData = async (ticker) => {
 
 // Fetch Yahoo Finance data
 const getYahooFinanceData = async (ticker) => {
+  console.log('YAHHOOOO');
   try {
     const queryOptions = {
       modules: [
@@ -378,7 +379,29 @@ const getInsiderSentiment = async (ticker) => {
 // Fetch additional data
 const getAdditionalStockData = async (ticker) => {
   try {
-    return await fetchAdditionalStockData(ticker);
+    const response = await fetchAdditionalStockData(ticker);
+
+    const marketCap = response.summaryDetail.marketCap;
+    const beta = response.defaultKeyStatistics.beta;
+    const sharesOutstanding = response.defaultKeyStatistics.sharesOutstanding;
+    const currentPrice = response.summaryDetail.previousClose;
+    const earningsQuarterlyGrowth =
+      response.defaultKeyStatistics.earningsQuarterlyGrowth;
+    const forwardPE = response.defaultKeyStatistics.forwardPE;
+    const priceToSalesRatio =
+      response.summaryDetail.priceToSalesTrailing12Months;
+    const PEGRatio = response.defaultKeyStatistics.pegRatio;
+
+    return {
+      currentPrice,
+      marketCap,
+      beta,
+      sharesOutstanding,
+      earningsQuarterlyGrowth,
+      forwardPE,
+      priceToSalesRatio,
+      PEGRatio,
+    };
   } catch (error) {
     console.error(
       `Error fetching additional stock data for ${ticker}:`,
