@@ -6,7 +6,6 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
     "dev": "concurrently \"redis-server &\" \"nodemon server.js\" \"node queueWorker.js\"",
-    "lint": "eslint .",
     "format": "prettier --write ."
   },
   "keywords": [],
@@ -38,10 +37,6 @@
   "description": "",
   "devDependencies": {
     "concurrently": "^9.0.1",
-    "eslint": "^9.11.1",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-prettier": "^5.2.1",
-    "nodemon": "^3.1.7",
-    "prettier": "^3.3.3"
+    "nodemon": "^3.1.7"
   }
 }

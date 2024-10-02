@@ -1,20 +1,15 @@
-const { ChatOpenAI, OpenAIEmbeddings } = require('@langchain/openai');
-const {
-  PromptTemplate,
-  HumanMessagePromptTemplate,
-} = require('@langchain/core/prompts');
-const { SystemMessage, HumanMessage } = require('@langchain/core/messages');
+const { ChatOpenAI } = require('@langchain/openai');
+const { PromptTemplate } = require('@langchain/core/prompts');
+// const {
+//   createLangChainWorkflow,
+//   executeLangChain,
+// } = require('@langchain/workflow');
+
+const { HumanMessage } = require('@langchain/core/messages');
 const sentimentService = require('../services/sentimentService');
 const stockService = require('../services/stockService');
 const aiService = require('../services/aiService');
-const {
-  formatNewsDataForSentiment,
-  truncateText,
-} = require('../utils/helpers');
 
-const { fetchStockNewsArticles } = require('../utils/queries');
-
-const embeddingsModel = new OpenAIEmbeddings();
 const model = new ChatOpenAI({ model: 'gpt-3.5-turbo-0125', temperature: 0.7 });
 
 const prompts = {
@@ -110,71 +105,13 @@ const generateAIOptionsChainExplanation = async (optionsChainText) => {
   }
 };
 
-// Utility function to perform sentiment analysis
-const performSentimentAnalysis = async (ticker) => {
-  try {
-    const news = await fetchStockNewsArticles(ticker);
-    const formattedNews = formatNewsDataForSentiment(
-      news.data.articles,
-      ticker
-    );
-
-    const sentimentResults = await Promise.all(
-      formattedNews.slice(0, 5).map(async (article) => {
-        if (article.content) {
-          const truncatedContent = truncateText(article.content, 500);
-          const sentimentResult = await analyzeSentiment(truncatedContent);
-          const sentimentScore =
-            sentimentService.getSentimentScore(sentimentResult);
-
-          // Store embeddings in Pinecone and offload embeddings storage to message queue
-          sentimentService.storeSentimentAnalysisEmbedding(
-            embeddingsModel,
-            article,
-            sentimentResult
-          );
-
-          return {
-            ...article,
-            sentiment: sentimentResult,
-            sentimentScore,
-          };
-        }
-        return article;
-      })
-    );
-
-    const sentimentSummary =
-      sentimentService.calculateSentimentSummary(sentimentResults);
-
-    return {
-      ...sentimentSummary,
-      articles: sentimentResults,
-    };
-  } catch (error) {
-    console.error(
-      `Error performing sentiment analysis for ticker: ${ticker}`,
-      error
-    );
-    throw new Error('Failed to perform sentiment analysis');
-  }
-};
-
 // Utility function to analyze sentiment using AI
-const analyzeSentiment = async (text) => {
+const generateSentimentAnalysis = async (ticker) => {
   try {
-    const sentimentPrompt = HumanMessagePromptTemplate.fromTemplate(
-      "Analyze the sentiment of the following text: {text}. Provide a summary of whether it's positive, negative, or neutral."
-    );
-    const formattedMessage = await sentimentPrompt.format({ text });
-    const sentimentResult = await model.call([
-      new SystemMessage('You are a sentiment analysis model.'),
-      new HumanMessage(formattedMessage),
-    ]);
-    return sentimentResult.content;
+    return await sentimentService.performSentimentAnalysis(ticker);
   } catch (error) {
-    console.error('Error analyzing sentiment:', error);
-    throw new Error('Failed to analyze sentiment');
+    console.error('Error generating sentiment analysis', error);
+    throw new Error('Failed to generate sentiment analysis');
   }
 };
 
@@ -221,12 +158,18 @@ const getFullStockAnalysis = async (req, res) => {
       stockData.additionalData
     );
     res.write(
-      `data: ${JSON.stringify({ type: 'aiExplanation', data: aiExplanation })}\n\n`
+      `data: ${JSON.stringify({
+        type: 'aiExplanation',
+        data: aiExplanation,
+      })}\n\n`
     );
 
-    const sentimentResults = await performSentimentAnalysis(ticker);
+    const sentimentResults = await generateSentimentAnalysis(ticker);
     res.write(
-      `data: ${JSON.stringify({ type: 'sentimentAnalysis', data: sentimentResults })}\n\n`
+      `data: ${JSON.stringify({
+        type: 'sentimentAnalysis',
+        data: sentimentResults,
+      })}\n\n`
     );
 
     const aiTAexplanation = await generateAItechnicalExplanation(
@@ -234,14 +177,20 @@ const getFullStockAnalysis = async (req, res) => {
       ticker
     );
     res.write(
-      `data: ${JSON.stringify({ type: 'technicalAnalysis', data: aiTAexplanation })}\n\n`
+      `data: ${JSON.stringify({
+        type: 'technicalAnalysis',
+        data: aiTAexplanation,
+      })}\n\n`
     );
 
     const optionsChainExplanation = await generateAIOptionsChainExplanation(
       stockData.optionsChainText
     );
     res.write(
-      `data: ${JSON.stringify({ type: 'optionsChainAnalysis', data: optionsChainExplanation })}\n\n`
+      `data: ${JSON.stringify({
+        type: 'optionsChainAnalysis',
+        data: optionsChainExplanation,
+      })}\n\n`
     );
 
     const insiderSentiment = await analyzeInsiderSentiment(
@@ -249,7 +198,10 @@ const getFullStockAnalysis = async (req, res) => {
       stockData.insiderSentiment
     );
     res.write(
-      `data: ${JSON.stringify({ type: 'insiderSentiment', data: insiderSentiment })}\n\n`
+      `data: ${JSON.stringify({
+        type: 'insiderSentiment',
+        data: insiderSentiment,
+      })}\n\n`
     );
 
     // Finalize the response

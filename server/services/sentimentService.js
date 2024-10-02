@@ -1,11 +1,19 @@
 const { Pinecone } = require('@pinecone-database/pinecone');
 const { Queue } = require('bullmq');
-const { OpenAIEmbeddings } = require('@langchain/openai');
+const { OpenAIEmbeddings, ChatOpenAI } = require('@langchain/openai');
+const { HumanMessagePromptTemplate } = require('@langchain/core/prompts');
+const { HumanMessage, SystemMessage } = require('@langchain/core/messages');
 
-const { truncateText } = require('../utils/helpers');
+const { fetchStockNewsArticles } = require('../utils/queries');
+const {
+  truncateText,
+  formatNewsDataForSentiment,
+} = require('../utils/helpers');
 
 const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
 const indexName = 'stock';
+
+const model = new ChatOpenAI({ model: 'gpt-3.5-turbo-0125', temperature: 0.7 });
 
 // Use OpenAIEmbeddings with the correct model and dimensions
 const embeddingsModel = new OpenAIEmbeddings({
@@ -58,6 +66,53 @@ const simplifiedSentiment = (sentimentResult) => {
   }
 };
 
+const performSentimentAnalysis = async (ticker) => {
+  try {
+    const news = await fetchStockNewsArticles(ticker);
+    const formattedNews = formatNewsDataForSentiment(
+      news.data.articles,
+      ticker
+    );
+
+    const sentimentResults = await Promise.all(
+      formattedNews.slice(0, 5).map(async (article) => {
+        if (article.content) {
+          const truncatedContent = truncateText(article.content, 500);
+          const sentimentResult = await analyzeSentiment(truncatedContent);
+          const sentimentScore = getSentimentScore(sentimentResult);
+
+          // Store embeddings in Pinecone and offload embeddings storage to message queue
+          storeSentimentAnalysisEmbedding(
+            embeddingsModel,
+            article,
+            sentimentResult
+          );
+
+          return {
+            ...article,
+            sentiment: sentimentResult,
+            sentimentScore,
+          };
+        }
+        return article;
+      })
+    );
+
+    const sentimentSummary = calculateSentimentSummary(sentimentResults);
+
+    return {
+      ...sentimentSummary,
+      articles: sentimentResults,
+    };
+  } catch (error) {
+    console.error(
+      `Error performing sentiment analysis for ticker: ${ticker}`,
+      error
+    );
+    throw new Error('Failed to perform sentiment analysis');
+  }
+};
+
 const storeEmbeddingTask = async (embedding, metadata) => {
   try {
     await embeddingQueue.add('createEmbedding', { embedding, metadata });
@@ -78,7 +133,9 @@ const storeSentimentAnalysisEmbedding = async (
 ) => {
   try {
     // Create a more informative embedding input by including title and author
-    const enrichedContent = `${article.title} by ${article.author}. ${truncateText(article.content, 1000)}`;
+    const enrichedContent = `${article.title} by ${
+      article.author
+    }. ${truncateText(article.content, 1000)}`;
     const embedding = await embeddingsModel.embedQuery(enrichedContent);
     const sentimentCategory = simplifiedSentiment(sentimentResult);
 
@@ -92,6 +149,23 @@ const storeSentimentAnalysisEmbedding = async (
     });
   } catch (err) {
     console.error('Error generating/storing embedding:', err);
+  }
+};
+
+const analyzeSentiment = async (text) => {
+  try {
+    const sentimentPrompt = HumanMessagePromptTemplate.fromTemplate(
+      "Analyze the sentiment of the following text: {text}. Provide a summary of whether it's positive, negative, or neutral."
+    );
+    const formattedMessage = await sentimentPrompt.format({ text });
+    const sentimentResult = await model.call([
+      new SystemMessage('You are a sentiment analysis model.'),
+      new HumanMessage(formattedMessage),
+    ]);
+    return sentimentResult.content;
+  } catch (error) {
+    console.error('Error analyzing sentiment:', error);
+    throw new Error('Failed to analyze sentiment');
   }
 };
 
@@ -211,6 +285,7 @@ const querySimliarArticles = async (queryText) => {
 };
 
 module.exports = {
+  performSentimentAnalysis,
   initPinecone,
   storeSentimentAnalysisEmbedding,
   storeEmbeddingTask,
