@@ -6,21 +6,29 @@ const { sanitizeId } = require('./utils/helpers');
 const { initPinecone } = require('./services/sentimentService');
 
 const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
+const Redis = require('ioredis');
 
 console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('REDIS_URL:', process.env.REDIS_URL);
 
 let redisConnectionOptions;
 
-if (process.env.NODE_ENV === 'development') {
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.REDIS_URL) {
+    throw new Error('REDIS_URL is not set in production environment');
+  }
+  // Use the Upstash Redis URL in production
+  redisConnectionOptions = {
+    connection: new Redis(process.env.REDIS_URL),
+  };
+  console.log('Using production Redis URL:', process.env.REDIS_URL);
+} else {
+  // Use local Redis in development
   redisConnectionOptions = {
     host: '127.0.0.1',
     port: 6379,
   };
-} else {
-  redisConnectionOptions = {
-    url: process.env.REDIS_URL,
-  };
+  console.log('Using development Redis options:', redisConnectionOptions);
 }
 
 // Create a new worker to handle the embedding jobs
