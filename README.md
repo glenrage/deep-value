@@ -77,17 +77,25 @@
 ## Installation
 
 1. Clone the repository.
-2. Install dependencies:
+2. Ensure you are in the root director:
+3. Install dependencies
 
    ```
-   npm install
+   npm install:all
    ```
+
+4. Start the app, preferably in two terminal windows
+
+   ```
+   npm run dev:server
+   ```
+
+   ```
+   npm run dev:client
+   ```
+
+   or run to start client and server in a single terminal
 
    ```
    npm run dev
-   ```
-
-3. In a separate terminal run to start local redis-server
-   ```
-   redis-server
    ```

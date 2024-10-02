@@ -11,6 +11,9 @@ const StockAnalysis = () => {
   const [sentimentAnalysis, setSentimentAnalysis] = useState(null);
   const [technicalAnalysis, setTechnicalAnalysis] = useState(null);
   const [insiderSentiment, setInsiderSentiment] = useState(null);
+  const [optionsChainAnalysis, setOptionsChainAnalysis] = useState(null);
+  const [comprehensiveAnalysis, setComprehensiveAnalysis] = useState(null);
+
   const [error, setError] = useState(null);
 
   // Define a function to handle the form submission
@@ -23,6 +26,8 @@ const StockAnalysis = () => {
     setSentimentAnalysis(null);
     setTechnicalAnalysis(null);
     setInsiderSentiment(null);
+    setOptionsChainAnalysis(null);
+    setComprehensiveAnalysis(null);
     setError(null);
 
     // Fetch data using SSE
@@ -45,8 +50,14 @@ const StockAnalysis = () => {
           case 'technicalAnalysis':
             setTechnicalAnalysis(data.data);
             break;
+          case 'optionsChainAnalysis':
+            setOptionsChainAnalysis(data.data);
+            break;
           case 'insiderSentiment':
             setInsiderSentiment(data.data);
+            break;
+          case 'comprehensiveAnalysis':
+            setComprehensiveAnalysis(data.data);
             break;
           case 'complete':
             console.log('Analysis complete');
@@ -75,18 +86,18 @@ const StockAnalysis = () => {
   };
 
   const renderStockData = (data) => (
-    <div className='bg-white p-4 rounded shadow mt-4 w-full break-words'>
-      <h3 className='text-lg font-semibold mb-2'>Stock Data</h3>
-      <pre className='text-sm overflow-auto'>
+    <div className="bg-white p-4 rounded shadow mt-4 w-full break-words">
+      <h3 className="text-lg font-semibold mb-2">Stock Data</h3>
+      <pre className="text-sm overflow-auto">
         {JSON.stringify(data, null, 2)}
       </pre>
     </div>
   );
 
   const renderDCFAnalysis = (data) => (
-    <div className='bg-white p-4 rounded shadow mt-4 w-full break-words'>
-      <h3 className='text-lg font-semibold mb-2'>DCF Analysis</h3>
-      <pre className='text-sm overflow-auto'>
+    <div className="bg-white p-4 rounded shadow mt-4 w-full break-words">
+      <h3 className="text-lg font-semibold mb-2">DCF Analysis</h3>
+      <pre className="text-sm overflow-auto">
         {JSON.stringify(data, null, 2)}
       </pre>
     </div>
@@ -97,30 +108,30 @@ const StockAnalysis = () => {
     const paragraphs = data.split('\n').map((paragraph, index) => {
       if (paragraph.startsWith('-')) {
         return (
-          <h4 key={index} className='text-md font-semibold mt-2'>
+          <h4 key={index} className="text-md font-semibold mt-2">
             {paragraph.substring(1).trim()}
           </h4>
         );
       }
       return (
-        <p key={index} className='text-sm mt-1'>
+        <p key={index} className="text-sm mt-1">
           {paragraph}
         </p>
       );
     });
 
     return (
-      <div className='bg-white p-4 rounded shadow mt-4 w-full break-words'>
-        <h3 className='text-lg font-semibold mb-2'>AI Explanation</h3>
+      <div className="bg-white p-4 rounded shadow mt-4 w-full break-words">
+        <h3 className="text-lg font-semibold mb-2">AI Explanation</h3>
         {paragraphs}
       </div>
     );
   };
 
   const renderSentimentAnalysis = (data) => (
-    <div className='bg-white p-4 rounded shadow mt-4 w-full break-words'>
-      <h3 className='text-lg font-semibold mb-2'>Sentiment Analysis</h3>
-      <pre className='text-sm overflow-auto'>
+    <div className="bg-white p-4 rounded shadow mt-4 w-full break-words">
+      <h3 className="text-lg font-semibold mb-2">Sentiment Analysis</h3>
+      <pre className="text-sm overflow-auto">
         {JSON.stringify(data, null, 2)}
       </pre>
     </div>
@@ -132,21 +143,21 @@ const StockAnalysis = () => {
       // Check if the paragraph is a subtitle or just a text line
       if (paragraph.startsWith('-')) {
         return (
-          <h4 key={index} className='text-md font-semibold mt-2'>
+          <h4 key={index} className="text-md font-semibold mt-2">
             {paragraph.substring(1).trim()}
           </h4>
         );
       }
       return (
-        <p key={index} className='text-sm mt-1'>
+        <p key={index} className="text-sm mt-1">
           {paragraph}
         </p>
       );
     });
 
     return (
-      <div className='bg-white p-4 rounded shadow mt-4 w-full break-words'>
-        <h3 className='text-lg font-semibold mb-2'>Technical Analysis</h3>
+      <div className="bg-white p-4 rounded shadow mt-4 w-full break-words">
+        <h3 className="text-lg font-semibold mb-2">Technical Analysis</h3>
         {paragraphs}
       </div>
     );
@@ -158,36 +169,76 @@ const StockAnalysis = () => {
       // Check if the paragraph is a subtitle or just a text line
       if (paragraph.startsWith('-')) {
         return (
-          <h4 key={index} className='text-md font-semibold mt-2'>
+          <h4 key={index} className="text-md font-semibold mt-2">
             {paragraph.substring(1).trim()}
           </h4>
         );
       }
       return (
-        <p key={index} className='text-sm mt-1'>
+        <p key={index} className="text-sm mt-1">
           {paragraph}
         </p>
       );
     });
 
     return (
-      <div className='bg-white p-4 rounded shadow mt-4 w-full break-words'>
-        <h3 className='text-lg font-semibold mb-2'>Insider Sentiment</h3>
+      <div className="bg-white p-4 rounded shadow mt-4 w-full break-words">
+        <h3 className="text-lg font-semibold mb-2">Insider Sentiment</h3>
         {paragraphs}
       </div>
     );
   };
 
+  const renderOptionsChainAnalysis = (data) => {
+    const paragraphs = data.split('\n').map((paragraph, index) => {
+      if (paragraph.startsWith('-')) {
+        return (
+          <h4 key={index} className="text-md font-semibold mt-2">
+            {paragraph.substring(1).trim()}
+          </h4>
+        );
+      }
+      return (
+        <p key={index} className="text-sm mt-1">
+          {paragraph}
+        </p>
+      );
+    });
+
+    return (
+      <div className="bg-white p-4 rounded shadow mt-4 w-full break-words">
+        <h3 className="text-lg font-semibold mb-2">Options Chain Analysis</h3>
+        {paragraphs}
+      </div>
+    );
+  };
+
+  const renderComprehensiveAnalysis = (data) => {
+    return (
+      <div className="bg-white p-4 rounded shadow mt-4 w-full break-words whitespace-pre-wrap">
+        <h3 className="text-lg font-semibold mb-2">Comprehensive Analysis</h3>
+        {Object.entries(data).map(([key, value]) => (
+          <div key={key} className="mb-4">
+            <strong className="text-md font-semibold">
+              {key.replace(/([A-Z])/g, ' $1')}
+            </strong>
+            <p className="text-sm mt-1">{value}</p>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
-    <div className='max-w-4xl mx-auto mt-10 p-4'>
-      <h2 className='text-2xl font-bold mb-6 text-center'>Stock Analysis</h2>
-      <div className='flex flex-col items-center space-y-4 mb-4'>
+    <div className="max-w-4xl mx-auto mt-10 p-4">
+      <h2 className="text-2xl font-bold mb-6 text-center">Stock Analysis</h2>
+      <div className="flex flex-col items-center space-y-4 mb-4">
         <input
-          type='text'
+          type="text"
           value={ticker}
           onChange={(e) => setTicker(e.target.value)}
-          placeholder='Enter stock ticker'
-          className='border border-gray-300 rounded px-4 py-2 w-full max-w-sm'
+          placeholder="Enter stock ticker"
+          className="border border-gray-300 rounded px-4 py-2 w-full max-w-sm"
         />
         <button
           onClick={handleFetchAnalysis}
@@ -196,12 +247,13 @@ const StockAnalysis = () => {
             fetching
               ? 'bg-gray-400 cursor-not-allowed'
               : 'bg-blue-600 hover:bg-blue-700'
-          }`}>
+          }`}
+        >
           {fetching ? 'Fetching...' : 'Get Analysis'}
         </button>
       </div>
       {error && (
-        <div className='bg-red-100 text-red-700 p-4 rounded mt-4 w-full text-center'>
+        <div className="bg-red-100 text-red-700 p-4 rounded mt-4 w-full text-center">
           Error: {error}
         </div>
       )}
@@ -211,6 +263,9 @@ const StockAnalysis = () => {
       {sentimentAnalysis && renderSentimentAnalysis(sentimentAnalysis)}
       {technicalAnalysis && renderTechnicalAnalysis(technicalAnalysis)}
       {insiderSentiment && renderInsiderSentiment(insiderSentiment)}
+      {optionsChainAnalysis && renderOptionsChainAnalysis(optionsChainAnalysis)}
+      {comprehensiveAnalysis &&
+        renderComprehensiveAnalysis(comprehensiveAnalysis)}
     </div>
   );
 };
