@@ -7,6 +7,9 @@ const { initPinecone } = require('./services/sentimentService');
 
 const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
 
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('REDIS_URL:', process.env.REDIS_URL);
+
 let redisConnectionOptions;
 
 if (process.env.NODE_ENV === 'development') {
