@@ -89,6 +89,25 @@ const fetchOptionsData = async (symbol, date) => {
   return optionsDataWithDate;
 };
 
+const fetchFMPStockData = async (ticker) => {
+  const apiKey = process.env.FMP_API_KEY;
+  const baseUrl = 'https://financialmodelingprep.com/api/v3';
+
+  // Fetch income statement and cash flow statement from FMP
+  const incomeStatementUrl = `${baseUrl}/income-statement/${ticker}?limit=2&apikey=${apiKey}`;
+  const cashFlowStatementUrl = `${baseUrl}/cash-flow-statement/${ticker}?limit=2&apikey=${apiKey}`;
+
+  const [incomeStatementRes, cashFlowStatementRes] = await Promise.all([
+    axios.get(incomeStatementUrl),
+    axios.get(cashFlowStatementUrl),
+  ]);
+
+  return {
+    incomeStatement: incomeStatementRes.data,
+    cashFlowStatement: cashFlowStatementRes.data,
+  };
+};
+
 module.exports = {
   fetchStockData,
   fetchAdditionalStockData,
@@ -96,4 +115,5 @@ module.exports = {
   fetchHistoricalData,
   fetchStockNewsArticles,
   fetchOptionsData,
+  fetchFMPStockData,
 };

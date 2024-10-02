@@ -3,9 +3,8 @@ import StockAnalysis from './components/StockAnalysis';
 
 function App() {
   return (
-    <div className='App'>
-      <h1>Stock Analysis</h1>
-      <StockAnalysis ticker='NVDA' />
+    <div className="App">
+      <StockAnalysis />
     </div>
   );
 }
