@@ -18,6 +18,10 @@ app.use('/api/stocks', stockRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/sentiment', sentimentRoutes);
 
+app.get('/', (res) => {
+  res.send('Stock server says hi!');
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
