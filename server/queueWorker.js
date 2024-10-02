@@ -7,6 +7,21 @@ const { initPinecone } = require('./services/sentimentService');
 
 const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
 
+let redisConnectionOptions;
+
+if (process.env.NODE_ENV === 'production') {
+  // Use Upstash Redis URL in production
+  redisConnectionOptions = {
+    url: process.env.REDIS_URL, // Replace with your Upstash Redis URL from environment variables
+  };
+} else {
+  // Use local Redis in development
+  redisConnectionOptions = {
+    host: '127.0.0.1',
+    port: 6379,
+  };
+}
+
 // Create a new worker to handle the embedding jobs
 const embeddingWorker = new Worker(
   'embeddingQueue',
@@ -53,10 +68,7 @@ const embeddingWorker = new Worker(
     }
   },
   {
-    connection: {
-      host: 'localhost',
-      port: 6379,
-    },
+    connection: redisConnectionOptions,
   }
 );
 
