@@ -10,12 +10,14 @@ const StockAnalysis = () => {
   const [analysisData, setAnalysisData] = useState({
     dcfAnalysis: { data: null, loading: false },
     aiExplanation: { data: null, loading: false },
-    sentimentAnalysis: { data: null, loading: false },
+    sentimentOverview: { data: null, loading: false },
     technicalAnalysis: { data: null, loading: false },
     insiderSentiment: { data: null, loading: false },
     optionsChainAnalysis: { data: null, loading: false },
-    comprehensiveAnalysis: { data: null, loading: false },
+    comprehensiveRecommendation: { data: null, loading: false },
   });
+
+  console.log(analysisData);
 
   const handleFetchAnalysis = () => {
     if (!ticker) return;
@@ -27,14 +29,15 @@ const StockAnalysis = () => {
     setAnalysisData({
       dcfAnalysis: { data: null, loading: true },
       aiExplanation: { data: null, loading: true },
-      sentimentAnalysis: { data: null, loading: true },
+      sentimentOverview: { data: null, loading: true },
       technicalAnalysis: { data: null, loading: true },
       insiderSentiment: { data: null, loading: true },
       optionsChainAnalysis: { data: null, loading: true },
-      comprehensiveAnalysis: { data: null, loading: true },
+      comprehensiveRecommendation: { data: null, loading: true },
     });
 
     const onMessage = (data) => {
+      console.log('Data:', data);
       if (data.type === 'complete') {
         setFetching(false);
         setError(null);
@@ -145,7 +148,7 @@ const StockAnalysis = () => {
   const SentimentAnalysisCard = ({ title, data, loading }) => (
     <Card className="w-full mt-4 border border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-300 h-96 bg-white">
       <h5 className="text-lg font-semibold mb-1 text-blue-800">{title}</h5>
-      {loading ? (
+      {!analysisData && loading ? (
         <div className="flex justify-center items-center h-full">
           <Spinner
             aria-label={`Loading ${title}`}
@@ -292,13 +295,13 @@ const StockAnalysis = () => {
         />
         <ComprehensiveAnalysisCard
           title="Comprehensive Analysis"
-          data={analysisData.comprehensiveAnalysis.data}
-          loading={analysisData.comprehensiveAnalysis.loading}
+          data={analysisData.comprehensiveRecommendation.data}
+          loading={analysisData.comprehensiveRecommendation.loading}
         />
         <SentimentAnalysisCard
           title="News & Analyst Sentiment Analysis"
-          data={analysisData.sentimentAnalysis.data}
-          loading={analysisData.sentimentAnalysis.loading}
+          data={analysisData.sentimentOverview.data}
+          loading={analysisData.sentimentOverview.loading}
         />
         <AnalysisCard
           title="Technical Analysis"

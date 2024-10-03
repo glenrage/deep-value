@@ -17,6 +17,7 @@ const {
 } = require('../utils/helpers');
 
 const getFMPStockData = async (ticker) => {
+  console.log('fetching FPMS data');
   try {
     const response = await fetchFMPStockData(ticker);
 
