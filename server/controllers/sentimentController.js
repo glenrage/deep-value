@@ -1,3 +1,4 @@
+const redisClient = require('../services/redisClient');
 const { ChatOpenAI } = require('@langchain/openai');
 const { PromptTemplate } = require('@langchain/core/prompts');
 
@@ -24,10 +25,9 @@ const createStockAnalysisParser = () => {
     technicalAnalysis: 'A brief technical analysis of the stock',
     fundamentalAnalysis: "A summary of the stock's fundamental analysis",
     sentimentOverview: 'An overview of the current market sentiment',
-    riskAssessment: 'An assessment of potential risks',
     optionsAnalysis:
       'An analysis of the options chain and implied market sentiment',
-    investmentRecommendation:
+    comprehensiveRecommendation:
       'A concise investment recommendation, buy or sell short or long term',
   });
 };
@@ -38,9 +38,8 @@ const createComprehensiveStockAnalysisChain = (parser) => {
     'Provide a comprehensive analysis of {ticker} stock based on the following data:\n' +
       'Technical Data: {technicalData}\n' +
       'Financial Data: {financialData}\n' +
-      'Market Sentiment: {marketSentiment}\n' +
+      'Market Sentiment: {sentimentOverview}\n' +
       'Options Chain Analysis: {optionsAnalysis}\n' +
-      'Recent News: {recentNews}\n\n' +
       'Please structure your response as follows:\n' +
       '{format_instructions}'
   );
@@ -185,9 +184,27 @@ const getFullStockAnalysis = async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
 
   try {
+    const cachedData = await redisClient.get(ticker);
+
+    if (cachedData) {
+      console.log('Serving from cache');
+      const parsedData = JSON.parse(cachedData);
+
+      for (const [key, value] of Object.entries(parsedData.data)) {
+        res.write(`data: ${JSON.stringify({ type: key, data: value })}\n\n`);
+      }
+
+      res.write(`data: ${JSON.stringify({ type: 'complete' })}\n\n`);
+      res.end();
+      return;
+    }
+
     const stockData = await fetchStockData(ticker);
     res.write(
-      `data: ${JSON.stringify({ type: 'stockData', data: stockData })}\n\n`
+      `data: ${JSON.stringify({
+        type: 'stockData',
+        data: stockData.additionalData,
+      })}\n\n`
     );
 
     const dcfResult = await performDCFCalculation(ticker, stockData);
@@ -209,7 +226,7 @@ const getFullStockAnalysis = async (req, res) => {
     const sentimentResults = await generateSentimentAnalysis(ticker);
     res.write(
       `data: ${JSON.stringify({
-        type: 'sentimentAnalysis',
+        type: 'sentimentOverview',
         data: sentimentResults,
       })}\n\n`
     );
@@ -248,22 +265,38 @@ const getFullStockAnalysis = async (req, res) => {
 
     const parser = createStockAnalysisParser();
     const chain = createComprehensiveStockAnalysisChain(parser);
+
     const comprehensiveAnalysis = await chain.invoke({
       ticker,
       technicalData: JSON.stringify(stockData.technicalData),
       financialData: JSON.stringify(stockData.additionalData),
-      marketSentiment: JSON.stringify(sentimentResults),
+      sentimentOverview: JSON.stringify(sentimentResults),
       optionsAnalysis: JSON.stringify(optionsChainExplanation),
-      recentNews: JSON.stringify(stockData.recentNews),
       format_instructions: parser.getFormatInstructions(),
     });
 
     res.write(
       `data: ${JSON.stringify({
-        type: 'comprehensiveAnalysis',
+        type: 'comprehensiveRecommendation',
         data: comprehensiveAnalysis,
       })}\n\n`
     );
+
+    const responseData = JSON.stringify({
+      type: 'complete',
+      data: {
+        stockData: stockData.additionalData,
+        dcfResult,
+        aiExplanation,
+        sentimentResults,
+        aiTAexplanation,
+        optionsChainExplanation,
+        insiderSentiment,
+        comprehensiveAnalysis,
+      },
+    });
+
+    await redisClient.set(ticker, responseData, { EX: 43200 });
 
     // Finalize the response
     res.write(`data: ${JSON.stringify({ type: 'complete' })}\n\n`);

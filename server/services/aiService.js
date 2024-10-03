@@ -60,9 +60,7 @@ const getTAExplanation = async (technicalData, ticker) => {
   const messageContent = `
   You are a financial analyst with expertise in technical analysis. Please provide an analysis of the technical indicators for the stock ticker: ${ticker}.
   
-  
   The following data represents the most recent values for the stock:
-  
   
   1. Simple Moving Average (SMA):
       - 14-Day SMA: ${technicalData.sma.current}
@@ -113,8 +111,7 @@ const getTAExplanation = async (technicalData, ticker) => {
   - What is the significance of the MACD signal crossovers?
   - How does the OBV trend relate to the stock's price movement?
   
-  
-  Please provide a comprehensive analysis and clear conclusions.
+  Provide a buy or sell recommendation at the end.
   `;
 
   try {
@@ -158,7 +155,7 @@ const getOptionsChainExplanation = async (optionsChainText) => {
   - Based on implied volatility, what are investors' expectations for future price movements?
   - Is there evidence of institutional hedging or speculative behavior?
   
-  Please provide a detailed analysis in simple terms to maximize profit
+  Provide a buy or sell of a specifi option and timeframe at the end.
   `;
 
   try {
