@@ -7,6 +7,8 @@ const StockAnalysis = () => {
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState(null);
 
+  console.log('err', error);
+
   const [analysisData, setAnalysisData] = useState({
     dcfAnalysis: { data: null, loading: false },
     aiExplanation: { data: null, loading: false },

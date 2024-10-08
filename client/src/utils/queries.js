@@ -11,7 +11,8 @@ if (process.env.NODE_ENV === 'development') {
 // Fetch full stock analysis using Server-Sent Events (SSE)
 export const fetchFullStockAnalysis = (ticker, onMessage, onError) => {
   const eventSource = new EventSource(
-    `${BASE_URL}/api/sentiment/explain?ticker=${ticker}`
+    `${BASE_URL}/api/sentiment/explain?ticker=${ticker}`,
+    { withCredentials: false }
   );
 
   eventSource.onmessage = (event) => {
