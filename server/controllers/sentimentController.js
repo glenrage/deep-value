@@ -1,4 +1,4 @@
-const redisClient = require('../services/redisClient');
+// const redisClient = require('../services/redisClient');
 const { ChatOpenAI } = require('@langchain/openai');
 const { PromptTemplate } = require('@langchain/core/prompts');
 

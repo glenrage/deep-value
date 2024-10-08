@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@alpacahq/alpaca-trade-api": "^3.1.2",
     "@huggingface/inference": "^2.8.0",
     "@huggingface/transformers": "^3.0.0-alpha.16",
     "@langchain/core": "^0.3.3",
@@ -33,6 +34,7 @@
     "redis-cli": "^2.1.2",
     "redis-server": "^1.2.2",
     "technicalindicators": "^3.1.0",
+    "ws": "^8.18.0",
     "yahoo-finance2": "^2.13.0"
   },
   "description": "",
