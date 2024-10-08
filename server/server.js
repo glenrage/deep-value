@@ -7,12 +7,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-const corsOptions = {
-  origin: 'https://glenrage.github.io', // Replace with your actual front-end origin
-  optionsSuccessStatus: 200, // Some browsers require this for 204 responses
-};
-
-app.use(cors(corsOptions));
+app.use(cors());
 app.use(express.json());
 
 const stockRoutes = require('./routes/stockRoutes');
