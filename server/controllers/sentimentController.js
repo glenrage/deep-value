@@ -182,22 +182,24 @@ const getFullStockAnalysis = async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*'); // Add CORS for SSE response
+  res.flushHeaders(); // Ensure headers are sent immediately
 
   try {
-    const cachedData = await redisClient.get(ticker);
+    // const cachedData = await redisClient.get(ticker);
 
-    if (cachedData) {
-      console.log('Serving from cache');
-      const parsedData = JSON.parse(cachedData);
+    // if (cachedData) {
+    //   console.log('Serving from cache');
+    //   const parsedData = JSON.parse(cachedData);
 
-      for (const [key, value] of Object.entries(parsedData.data)) {
-        res.write(`data: ${JSON.stringify({ type: key, data: value })}\n\n`);
-      }
+    //   for (const [key, value] of Object.entries(parsedData.data)) {
+    //     res.write(`data: ${JSON.stringify({ type: key, data: value })}\n\n`);
+    //   }
 
-      res.write(`data: ${JSON.stringify({ type: 'complete' })}\n\n`);
-      res.end();
-      return;
-    }
+    //   res.write(`data: ${JSON.stringify({ type: 'complete' })}\n\n`);
+    //   res.end();
+    //   return;
+    // }
 
     const stockData = await fetchStockData(ticker);
     res.write(
@@ -282,21 +284,21 @@ const getFullStockAnalysis = async (req, res) => {
       })}\n\n`
     );
 
-    const responseData = JSON.stringify({
-      type: 'complete',
-      data: {
-        stockData: stockData.additionalData,
-        dcfResult,
-        aiExplanation,
-        sentimentResults,
-        aiTAexplanation,
-        optionsChainExplanation,
-        insiderSentiment,
-        comprehensiveAnalysis,
-      },
-    });
+    // const responseData = JSON.stringify({
+    //   type: 'complete',
+    //   data: {
+    //     stockData: stockData.additionalData,
+    //     dcfResult,
+    //     aiExplanation,
+    //     sentimentResults,
+    //     aiTAexplanation,
+    //     optionsChainExplanation,
+    //     insiderSentiment,
+    //     comprehensiveAnalysis,
+    //   },
+    // });
 
-    await redisClient.set(ticker, responseData, { EX: 43200 });
+    // await redisClient.set(ticker, responseData, { EX: 43200 });
 
     // Finalize the response
     res.write(`data: ${JSON.stringify({ type: 'complete' })}\n\n`);

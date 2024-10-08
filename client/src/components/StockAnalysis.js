@@ -6,6 +6,7 @@ const StockAnalysis = () => {
   const [ticker, setTicker] = useState('');
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState(null);
+  const [eventSource, setEventSource] = useState(null); // State to store EventSource instance
 
   const [analysisData, setAnalysisData] = useState({
     dcfAnalysis: { data: null, loading: false },
