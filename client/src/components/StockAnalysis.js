@@ -13,6 +13,7 @@ const StockAnalysis = () => {
   const [ticker, setTicker] = useState('');
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState(null);
+  const [stream, setStream] = useState(false); // New state to control streaming
 
   const [analysisData, setAnalysisData] = useState({
     dcfAnalysis: { data: null, loading: false },
@@ -31,6 +32,7 @@ const StockAnalysis = () => {
 
     setFetching(true);
     setError(null);
+    setStream(true); // Start the stream
 
     // Resetting analysis data to show loading for each section
     setAnalysisData({
@@ -90,13 +92,13 @@ const StockAnalysis = () => {
         </Button>
       </div>
 
-      <StockTicker ticker={ticker} />
+      <StockTicker ticker={ticker} stream={stream} />
 
-      {/* {error && (
+      {error && (
         <div className="bg-red-100 text-red-700 p-4 rounded mt-4 w-full text-center">
           Error: {error}
         </div>
-      )} */}
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <DCFAnalysisCard
