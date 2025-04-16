@@ -345,4 +345,5 @@ module.exports = {
   getFullStockAnalysis,
   searchArticlesBySentiment,
   searchSemnaticArticles,
+  getRagResponse,
 };
