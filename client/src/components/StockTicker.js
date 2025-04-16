@@ -42,7 +42,6 @@ const StockTicker = () => {
       };
     };
 
-    // Initiate the WebSocket connection
     connectWebSocket();
 
     // Check market status
