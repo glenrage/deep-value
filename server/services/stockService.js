@@ -641,6 +641,37 @@ function calculateWACC(data) {
   return wacc;
 }
 
+const getYahooExchange = async (ticker) => {
+  if (!ticker) {
+    console.warn('[Yahoo Fetch] Ticker symbol is required.');
+    return null;
+  }
+  const upperCaseTicker = ticker.toUpperCase();
+
+  try {
+    const quote = await yahooFinance.quote(upperCaseTicker);
+
+    if (quote && quote.exchange) {
+      console.log(
+        `[Yahoo Fetch] Found exchange for ${upperCaseTicker}: ${quote.exchange}`
+      );
+      return quote.exchange;
+    } else {
+      console.warn(
+        `[Yahoo Fetch] Exchange data not found in Yahoo quote for ${upperCaseTicker}.`
+      );
+      return null;
+    }
+  } catch (error) {
+    // Keep error handling minimal: Log and return null
+    // Common errors: Ticker not found (will throw), network issues.
+    console.warn(
+      `[Yahoo Fetch] Error fetching quote for ${upperCaseTicker}: ${error.message}`
+    );
+    return null;
+  }
+};
+
 module.exports = {
   getYahooFinanceData,
   calculateDCFAllScenarios,
@@ -650,4 +681,5 @@ module.exports = {
   getTechincalAnalysisData,
   getOptionsData,
   getFMPStockData,
+  getYahooExchange,
 };

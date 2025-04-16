@@ -8,12 +8,14 @@ import {
   SentimentAnalysisCard,
 } from './AnalysisCards';
 import { StockTicker } from './StockTicker';
+import { EarningsChatCard } from './EarningsChatCard';
 
 const StockAnalysis = () => {
   const [ticker, setTicker] = useState('');
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState(null);
-  const [stream, setStream] = useState(false); // New state to control streaming
+  const [stream, setStream] = useState(false);
+  const [currentTicker, setCurrentTicker] = useState('');
 
   const [analysisData, setAnalysisData] = useState({
     dcfAnalysis: { data: null, loading: false },
@@ -25,14 +27,14 @@ const StockAnalysis = () => {
     comprehensiveRecommendation: { data: null, loading: false },
   });
 
-  console.log('analysisData', analysisData);
-
   const handleFetchAnalysis = () => {
     if (!ticker) return;
+    const upperCaseTicker = ticker.toUpperCase();
 
     setFetching(true);
     setError(null);
     setStream(true); // Start the stream
+    setCurrentTicker(upperCaseTicker);
 
     // Resetting analysis data to show loading for each section
     setAnalysisData({
@@ -53,6 +55,7 @@ const StockAnalysis = () => {
       } else if (data.type === 'error') {
         setFetching(false);
         setError(data.message);
+        setCurrentTicker('');
       } else {
         setAnalysisData((prevData) => ({
           ...prevData,
@@ -62,12 +65,21 @@ const StockAnalysis = () => {
     };
 
     const onError = (error) => {
+      console.error('SSE Error:', error); // Log the actual error object
       setFetching(false);
       setError('Error fetching stock analysis data');
+      setCurrentTicker('');
+      setStream(false);
     };
 
     // Initiate fetching with the EventSource
     fetchFullStockAnalysis(ticker, onMessage, onError);
+  };
+
+  const handleTickerKeyDown = (event) => {
+    if (event.key === 'Enter' && !fetching && ticker) {
+      handleFetchAnalysis();
+    }
   };
 
   return (
@@ -80,6 +92,7 @@ const StockAnalysis = () => {
           type="text"
           value={ticker}
           onChange={(e) => setTicker(e.target.value)}
+          onKeyDown={handleTickerKeyDown}
           placeholder="Enter stock ticker"
           className="w-full max-w-lg border-gray-300 rounded-lg p-2 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-300 focus:ring-opacity-50 transition duration-300"
         />
@@ -137,6 +150,14 @@ const StockAnalysis = () => {
           data={analysisData.optionsChainAnalysis.data}
           loading={analysisData.optionsChainAnalysis.loading}
         />
+
+        <EarningsChatCard ticker={currentTicker} key={currentTicker} />
+
+        {!currentTicker && !fetching && (
+          <p className="text-center text-gray-500 dark:text-gray-400 mt-10">
+            Enter a stock ticker above to get started.
+          </p>
+        )}
       </div>
     </div>
   );

@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from 'react';
 
-const StockTicker = () => {
+const StockTicker = ({ ticker, stream }) => {
   const [price, setPrice] = useState(null);
   const [timestamp, setTimestamp] = useState(null);
   const [marketStatus, setMarketStatus] = useState('Checking...');
   const [isConnected, setIsConnected] = useState(false);
-
-  const stream = true;
-  const ticker = 'NVDA';
 
   useEffect(() => {
     let ws;
@@ -81,7 +78,7 @@ const StockTicker = () => {
       {price ? (
         <div className="text-center">
           <p className="text-green-500 text-4xl font-semibold mb-2">
-            ${price.toFixed(2)}
+            ${price?.toFixed(2)}
           </p>
           <p className="text-sm text-gray-500">Last updated at: {timestamp}</p>
         </div>
