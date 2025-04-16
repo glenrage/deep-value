@@ -5,5 +5,6 @@ const sentimentController = require('../controllers/sentimentController');
 router.get('/explain', sentimentController.getFullStockAnalysis);
 router.get('/semantic-search', sentimentController.searchSemnaticArticles);
 router.get('/sentiment-search', sentimentController.searchArticlesBySentiment);
+router.get('/rag', sentimentController.getRagResponse);
 
 module.exports = router;

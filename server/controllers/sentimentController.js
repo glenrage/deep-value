@@ -9,6 +9,11 @@ const { HumanMessage } = require('@langchain/core/messages');
 const sentimentService = require('../services/sentimentService');
 const stockService = require('../services/stockService');
 const aiService = require('../services/aiService');
+const transcriptService = require('../services/transcriptService');
+const embeddingService = require('../services/embeddingService');
+const { PineconeStore } = require('@langchain/pinecone');
+const { getPineconeIndex } = require('../services/pineCone');
+
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 const { model } = require('../constants');
@@ -338,6 +343,51 @@ const searchSemnaticArticles = async (req, res) => {
   } catch (error) {
     console.error('Error searching stock sentiment:', error);
     res.status(500).json({ error: 'Failed to search stock sentiment' });
+  }
+};
+
+const getRagResponse = async (req, res) => {
+  const { ticker, query } = req.query;
+
+  try {
+    const pineconeIndex = getPineconeIndex();
+    const transcript = await transcriptService.fetchEarningsTranscript(ticker);
+
+    // store the transcript in Pinecone
+    const namespace = await embeddingService.processAndStoreTranscript(
+      transcript,
+      ticker
+    );
+
+    const vectorStore = await PineconeStore.fromExistingIndex(
+      embeddingService.embeddingsModel,
+      { pineconeIndex, namespace }
+    );
+
+    const results = await vectorStore.similaritySearch(query, 5);
+
+    console.log('results', results);
+    const context = results.map((r) => r.pageContent).join('\n\n');
+
+    const prompt = `
+You are a financial analyst. Use the following excerpts from ${ticker}'s latest earnings call to answer the user's question.
+
+Context:
+${context}
+
+User Question:
+${query}
+    `;
+
+    const response = await gptModel.call([new HumanMessage(prompt)]);
+
+    res.json({
+      response: response.content,
+      contextUsed: results,
+    });
+  } catch (err) {
+    console.error('RAG error:', err);
+    res.status(500).json({ error: 'Failed to generate RAG response' });
   }
 };
 

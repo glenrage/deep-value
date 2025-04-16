@@ -1,17 +1,14 @@
-const { Pinecone } = require('@pinecone-database/pinecone');
 const { Queue } = require('bullmq');
 const { OpenAIEmbeddings, ChatOpenAI } = require('@langchain/openai');
 const { HumanMessagePromptTemplate } = require('@langchain/core/prompts');
 const { HumanMessage, SystemMessage } = require('@langchain/core/messages');
+const { getPineconeIndex, PINECONE_INDEX_NAME } = require('./pineCone');
 
 const { fetchStockNewsArticles } = require('../utils/queries');
 const {
   truncateText,
   formatNewsDataForSentiment,
 } = require('../utils/helpers');
-
-const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
-const indexName = 'stock';
 
 const model = new ChatOpenAI({ model: 'gpt-3.5-turbo-0125', temperature: 0.7 });
 
@@ -27,33 +24,6 @@ const embeddingQueue = new Queue('embeddingQueue', {
     port: 6379,
   },
 });
-
-const initPinecone = async () => {
-  const indexName = 'stock';
-
-  try {
-    const existingIndexes = await pc.listIndexes();
-    if (!existingIndexes.indexes.some((index) => index.name === indexName)) {
-      // If the index does not exist, create it
-      await pc.createIndex({
-        name: indexName,
-        dimension: 1536,
-        metric: 'cosine',
-        spec: {
-          serverless: {
-            cloud: 'aws',
-            region: 'us-east-1',
-          },
-        },
-      });
-    } else {
-      console.log(`Index ${indexName} already exists.`);
-    }
-  } catch (error) {
-    console.error('Error initializing Pinecone:', error);
-    throw error;
-  }
-};
 
 // Simplify the sentiment before storing
 const simplifiedSentiment = (sentimentResult) => {
@@ -209,8 +179,7 @@ const getSentimentScore = (sentimentResult) => {
 // New function to query Pinecone for articles based on sentiment
 const queryArticlesBySentiment = async (ticker, sentiment) => {
   try {
-    await initPinecone();
-    const index = pc.Index(indexName);
+    const pineconeIndex = getPineconeIndex();
 
     // Create a dummy query embedding (could use a more representative vector)
     const queryEmbedding = await embeddingsModel.embedQuery(
@@ -218,7 +187,7 @@ const queryArticlesBySentiment = async (ticker, sentiment) => {
     );
 
     // Perform a similarity query, including metadata filtering for sentiment and ticker
-    const queryResponse = await index.query({
+    const queryResponse = await pineconeIndex.query({
       vector: queryEmbedding,
       topK: 10,
       includeMetadata: true,
@@ -250,14 +219,13 @@ const queryArticlesBySentiment = async (ticker, sentiment) => {
 const querySimliarArticles = async (queryText) => {
   console.log('Querying for similar articles:', queryText);
   try {
-    await initPinecone();
-    const index = pc.Index(indexName);
+    const pineconeIndex = getPineconeIndex();
 
     const enrichedQueryText = `Find articles related to "${queryText}" in the financial news domain.`;
     const queryEmbedding = await embeddingsModel.embedQuery(enrichedQueryText);
 
     // Perform a semantic similarity search with the query embedding
-    const queryResponse = await index.query({
+    const queryResponse = await pineconeIndex.query({
       vector: queryEmbedding,
       topK: 10,
       includeMetadata: true,
@@ -286,7 +254,6 @@ const querySimliarArticles = async (queryText) => {
 
 module.exports = {
   performSentimentAnalysis,
-  initPinecone,
   storeSentimentAnalysisEmbedding,
   storeEmbeddingTask,
   getSentimentScore,
