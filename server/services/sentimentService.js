@@ -2,7 +2,7 @@ const { Queue } = require('bullmq');
 const { OpenAIEmbeddings, ChatOpenAI } = require('@langchain/openai');
 const { HumanMessagePromptTemplate } = require('@langchain/core/prompts');
 const { HumanMessage, SystemMessage } = require('@langchain/core/messages');
-const { getPineconeIndex, PINECONE_INDEX_NAME } = require('./pineCone');
+const { getPineconeIndex } = require('./pineCone');
 
 const { fetchStockNewsArticles } = require('../utils/queries');
 const {
