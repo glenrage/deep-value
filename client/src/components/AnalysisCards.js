@@ -58,19 +58,19 @@ const DCFAnalysisCard = ({ title, data, loading }) => (
             <div className="flex flex-wrap items-center">
               <span className="font-semibold text-blue-700">Best Case:</span>
               <span className="ml-2 text-gray-700">
-                ${data.bestCase.toFixed(2)}
+                ${data.bestCase?.toFixed(2)}
               </span>
             </div>
             <div className="flex flex-wrap items-center">
               <span className="font-semibold text-blue-700">Average Case:</span>
               <span className="ml-2 text-gray-700">
-                ${data.averageCase.toFixed(2)}
+                ${data.averageCase?.toFixed(2)}
               </span>
             </div>
             <div className="flex flex-wrap">
               <span className="font-semibold text-blue-700">Worst Case:</span>
               <span className="ml-2 text-gray-700">
-                ${data.worstCase.toFixed(2)}
+                ${data.worstCase?.toFixed(2)}
               </span>
             </div>
           </>

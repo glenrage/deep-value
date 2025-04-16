@@ -1,19 +1,47 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
+const { getYahooExchange } = require('./stockService');
 
 /**
  * Fetches the latest earnings transcript for a given ticker from fool.com.
  * Note: Scraping is fragile and may break if fool.com changes its website structure.
- * @param {string} ticker - The stock ticker symbol (e.g., 'NVDA').
- * @param {string} [exchange='nasdaq'] - The stock exchange (e.g., 'nasdaq', 'nyse').
+ * @param {string}
+ * @param {string}
  * @returns {Promise<string|null>} The transcript text as a single string, or null if not found or an error occurs.
  */
-const fetchEarningsTranscript = async (ticker, exchange = 'nasdaq') => {
-  // Ensure ticker and exchange are uppercase for URL consistency if needed
+const fetchEarningsTranscript = async (ticker) => {
   const upperCaseTicker = ticker.toUpperCase();
-  const lowerCaseExchange = exchange.toLowerCase();
+  let yahooExchangeCode;
 
-  const quotePageUrl = `https://www.fool.com/quote/${lowerCaseExchange}/${upperCaseTicker}/`;
+  yahooExchangeCode = await getYahooExchange(upperCaseTicker);
+  if (!yahooExchangeCode) {
+    console.error(
+      `[Transcript Fetch] Could not determine exchange for ${upperCaseTicker} from Yahoo Finance. Cannot proceed.`
+    );
+    return null;
+  }
+
+  let foolExchangeKey;
+  const codeUpper = yahooExchangeCode.toUpperCase();
+
+  if (codeUpper === 'NMS' || codeUpper === 'NASDAQ' || codeUpper === 'NAS') {
+    foolExchangeKey = 'nasdaq';
+  } else if (codeUpper === 'NYQ' || codeUpper === 'NYSE') {
+    foolExchangeKey = 'nyse';
+  } else if (codeUpper === 'ASE' || codeUpper === 'AMEX') {
+    foolExchangeKey = 'amex';
+  } else if (codeUpper === 'PCX') {
+    console.warn(
+      `[Transcript Fetch] Mapping NYSE Arca (PCX) for ${upperCaseTicker}. Fool.com URL might be incorrect. Trying 'other-otc'.`
+    );
+    foolExchangeKey = 'other-otc';
+  } else {
+    console.warn(
+      `[Transcript Fetch] Unhandled Yahoo exchange code "${yahooExchangeCode}" for ${upperCaseTicker}.`
+    );
+  }
+
+  const quotePageUrl = `https://www.fool.com/quote/${foolExchangeKey}/${upperCaseTicker}/`;
   console.log(
     `[Transcript Fetch] Step 1: Fetching quote page: ${quotePageUrl}`
   );

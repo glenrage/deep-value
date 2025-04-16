@@ -2,7 +2,7 @@ require('dotenv').config();
 
 const { Worker } = require('bullmq');
 const { sanitizeId } = require('./utils/helpers');
-const { getPineconeIndex } = require('./services/pineCone');
+const { initializePinecone, getPineconeIndex } = require('./services/pineCone');
 
 const Redis = require('ioredis');
 
@@ -28,59 +28,90 @@ if (process.env.NODE_ENV === 'production') {
   };
   console.log('Using development Redis options:', redisConnectionOptions);
 }
+async function startWorker() {
+  try {
+    console.log('Worker: Initializing Pinecone...');
+    await initializePinecone();
+    console.log('Worker: Pinecone initialized successfully.');
 
-// Create a new worker to handle the embedding jobs
-const embeddingWorker = new Worker(
-  'embeddingQueue',
-  async (job) => {
-    console.log(`Processing embedding job for: ${job.id}`); // Add this log to verify if the worker receives the job
-    const { embedding, metadata } = job.data;
-    try {
-      const pineconeIndex = getPineconeIndex();
+    const embeddingWorker = new Worker(
+      'embeddingQueue',
+      async (job) => {
+        console.log(`Worker: Processing embedding job for: ${job.id}`);
+        const { embedding, metadata } = job.data;
+        const sanitizedId = sanitizeId(metadata.title);
 
-      const sanitizedId = sanitizeId(metadata.title);
+        try {
+          const pineconeIndex = getPineconeIndex();
 
-      const existingEmbedding = await pineconeIndex.fetch([sanitizedId]);
-      if (
-        existingEmbedding &&
-        Object.keys(existingEmbedding.records).length > 0
-      ) {
-        console.log(
-          `Embedding for ${metadata.title} already exists in Pinecone. Skipping insertion.`
-        );
-        return;
+          const existing = await pineconeIndex.fetch([sanitizedId]);
+          if (existing && Object.keys(existing.records).length > 0) {
+            console.log(
+              `Worker: Embedding for ${sanitizedId} already exists. Skipping.`
+            );
+            return;
+          }
+
+          console.log(`Worker: Upserting embedding for ${sanitizedId}`);
+          await pineconeIndex.upsert([
+            {
+              id: sanitizedId,
+              values: embedding,
+              metadata: {
+                title: metadata.title,
+                source: metadata.source,
+                author: metadata.author,
+                sentiment: JSON.stringify(metadata.sentiment),
+                ticker: metadata.ticker,
+                sentimentCategory: metadata.sentimentCategory,
+              },
+            },
+          ]);
+
+          console.log(
+            `Worker: Stored embedding for article: ${metadata.title} (ID: ${sanitizedId})`
+          );
+        } catch (error) {
+          console.error(
+            `Worker: Error storing embedding for job ${job.id} (ID: ${sanitizedId}) in Pinecone:`,
+            error
+          );
+          // Re-throw the error so BullMQ marks the job as failed
+          throw error;
+        }
+      },
+      {
+        connection: redisConnectionOptions.connection,
+        // concurrency: 5 // You can adjust concurrency later
       }
+    );
 
-      await pineconeIndex.upsert([
-        {
-          id: sanitizedId,
-          values: embedding,
-          metadata: {
-            title: metadata.title,
-            source: metadata.source,
-            author: metadata.author,
-            sentiment: JSON.stringify(metadata.sentiment),
-            ticker: metadata.ticker,
-            sentimentCategory: metadata.sentimentCategory,
-          },
-        },
-      ]);
+    embeddingWorker.on('completed', (job, result) => {
+      console.log(`Worker: Embedding job completed for: ${job.id}`);
+    });
 
-      console.log(`Stored embedding for article: ${metadata.title}`);
-    } catch (error) {
-      console.error('Error storing embedding in Pinecone:', error);
-      throw error;
-    }
-  },
-  {
-    connection: redisConnectionOptions,
+    embeddingWorker.on('failed', (job, err) => {
+      // Log the specific job ID that failed and the error
+      console.error(
+        `Worker: Embedding job ${job?.id || 'unknown'} failed:`,
+        err.message
+      );
+      // console.error(err); // Log full error stack if needed for debugging
+    });
+
+    embeddingWorker.on('error', (err) => {
+      // Log errors originating from the worker itself (e.g., connection issues)
+      console.error('Worker encountered an error:', err);
+    });
+
+    console.log('Worker: Embedding worker started and listening for jobs.');
+  } catch (initError) {
+    console.error(
+      'Worker: FATAL - Failed to initialize dependencies (Pinecone/Redis):',
+      initError
+    );
+    process.exit(1); // Exit if essential services can't start
   }
-);
+}
 
-embeddingWorker.on('completed', (job) => {
-  console.log(`Embedding job completed for: ${job.id}`);
-});
-
-embeddingWorker.on('failed', (job, err) => {
-  console.error(`Embedding job failed for: ${job.id}`, err);
-});
+startWorker();
