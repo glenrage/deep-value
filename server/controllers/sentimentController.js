@@ -1,4 +1,4 @@
-// const redisClient = require('../services/redisClient');
+const redisClient = require('../services/redisClient');
 const { ChatOpenAI } = require('@langchain/openai');
 const { PromptTemplate } = require('@langchain/core/prompts');
 
@@ -9,7 +9,13 @@ const { HumanMessage } = require('@langchain/core/messages');
 const sentimentService = require('../services/sentimentService');
 const stockService = require('../services/stockService');
 const aiService = require('../services/aiService');
+const transcriptService = require('../services/transcriptService');
+const embeddingService = require('../services/embeddingService');
+const { PineconeStore } = require('@langchain/pinecone');
+const { getPineconeIndex } = require('../services/pineCone');
+
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const CACHE_TTL_SECONDS = 12 * 60 * 60; // 43200
 
 const { model } = require('../constants');
 
@@ -175,140 +181,357 @@ const analyzeInsiderSentiment = async (ticker, insiderSentiment) => {
 };
 
 // Controller function to get full stock & sentiment analysis using SSE
+// const getFullStockAnalysis = async (req, res) => {
+//   const { ticker } = req.query;
+
+//   // Set up headers for Server-Sent Events (SSE)
+//   res.setHeader('Content-Type', 'text/event-stream');
+//   res.setHeader('Cache-Control', 'no-cache');
+//   res.setHeader('Connection', 'keep-alive');
+//   res.setHeader('Access-Control-Allow-Origin', '*'); // Add CORS for SSE response
+//   res.flushHeaders(); // Ensure headers are sent immediately
+
+//   if (!ticker) {
+//     return res.status(400).send('Ticker query parameter is required.');
+//   }
+
+//   const upperCaseTicker = ticker.toUpperCase();
+//   const cacheKey = `analysis:${upperCaseTicker}`;
+
+//   const sendSseMessage = (data) => {
+//     if (!res.writableEnded) {
+//       // Check if the connection is still open
+//       res.write(`data: ${JSON.stringify(data)}\n\n`);
+//     } else {
+//       console.warn(
+//         `[SSE ${upperCaseTicker}] Attempted to write to closed connection.`
+//       );
+//     }
+//   };
+
+//   const endSseResponse = () => {
+//     if (!res.writableEnded) {
+//       res.end();
+//     }
+//   };
+
+//   try {
+//     const cachedData = await redisClient.get(cacheKey);
+
+//     if (cachedData) {
+//       console.log('Serving from cache');
+//       const parsedData = JSON.parse(cachedData);
+
+//       const streamOrder = [
+//         'stockData',
+//         'dcfAnalysis',
+//         'aiExplanation',
+//         'sentimentOverview',
+//         'technicalAnalysis',
+//         'optionsChainAnalysis',
+//         'insiderSentiment',
+//         'comprehensiveRecommendation',
+//       ];
+
+//       for (const key of streamOrder) {
+//         if (parsedData[key] !== undefined) {
+//           sendSseMessage({ type: key, data: parsedData[key] });
+//         }
+//       }
+
+//       sendSseMessage({ type: 'complete' });
+//       endSseResponse();
+//       return;
+//     }
+
+//     const stockData = await fetchStockData(ticker);
+//     res.write(
+//       `data: ${JSON.stringify({
+//         type: 'stockData',
+//         data: stockData.additionalData,
+//       })}\n\n`
+//     );
+
+//     const dcfResult = await performDCFCalculation(ticker, stockData);
+//     res.write(
+//       `data: ${JSON.stringify({ type: 'dcfAnalysis', data: dcfResult })}\n\n`
+//     );
+
+//     const aiExplanation = await generateAIExplanation(
+//       dcfResult,
+//       stockData.additionalData
+//     );
+//     res.write(
+//       `data: ${JSON.stringify({
+//         type: 'aiExplanation',
+//         data: aiExplanation,
+//       })}\n\n`
+//     );
+
+//     const sentimentResults = await generateSentimentAnalysis(ticker);
+//     res.write(
+//       `data: ${JSON.stringify({
+//         type: 'sentimentOverview',
+//         data: sentimentResults,
+//       })}\n\n`
+//     );
+
+//     const aiTAexplanation = await generateAItechnicalExplanation(
+//       stockData.technicalData.indicators,
+//       ticker
+//     );
+//     res.write(
+//       `data: ${JSON.stringify({
+//         type: 'technicalAnalysis',
+//         data: aiTAexplanation,
+//       })}\n\n`
+//     );
+
+//     const optionsChainExplanation = await generateAIOptionsChainExplanation(
+//       stockData.optionsChainText
+//     );
+//     res.write(
+//       `data: ${JSON.stringify({
+//         type: 'optionsChainAnalysis',
+//         data: optionsChainExplanation,
+//       })}\n\n`
+//     );
+
+//     const insiderSentiment = await analyzeInsiderSentiment(
+//       ticker,
+//       stockData.insiderSentiment
+//     );
+//     res.write(
+//       `data: ${JSON.stringify({
+//         type: 'insiderSentiment',
+//         data: insiderSentiment,
+//       })}\n\n`
+//     );
+
+//     const parser = createStockAnalysisParser();
+//     const chain = createComprehensiveStockAnalysisChain(parser);
+
+//     const comprehensiveAnalysis = await chain.invoke({
+//       ticker,
+//       technicalData: JSON.stringify(stockData.technicalData),
+//       financialData: JSON.stringify(stockData.additionalData),
+//       sentimentOverview: JSON.stringify(sentimentResults),
+//       optionsAnalysis: JSON.stringify(optionsChainExplanation),
+//       format_instructions: parser.getFormatInstructions(),
+//     });
+
+//     res.write(
+//       `data: ${JSON.stringify({
+//         type: 'comprehensiveRecommendation',
+//         data: comprehensiveAnalysis,
+//       })}\n\n`
+//     );
+
+//     // const responseData = JSON.stringify({
+//     //   type: 'complete',
+//     //   data: {
+//     //     stockData: stockData.additionalData,
+//     //     dcfResult,
+//     //     aiExplanation,
+//     //     sentimentResults,
+//     //     aiTAexplanation,
+//     //     optionsChainExplanation,
+//     //     insiderSentiment,
+//     //     comprehensiveAnalysis,
+//     //   },
+//     // });
+
+//     // await redisClient.set(ticker, responseData, { EX: 43200 });
+
+//     // Finalize the response
+//     res.write(`data: ${JSON.stringify({ type: 'complete' })}\n\n`);
+//     res.end();
+//   } catch (error) {
+//     console.error('Error running stock analysis pipeline:', error.message);
+//     res.write(
+//       `data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`
+//     );
+//     res.end();
+//   }
+// };
+
 const getFullStockAnalysis = async (req, res) => {
   const { ticker } = req.query;
+  if (!ticker) {
+    return res.status(400).send('Ticker query parameter is required.');
+  }
+  const upperCaseTicker = ticker.toUpperCase();
+  const cacheKey = `analysis:${upperCaseTicker}`;
 
   // Set up headers for Server-Sent Events (SSE)
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
-  res.setHeader('Access-Control-Allow-Origin', '*'); // Add CORS for SSE response
-  res.flushHeaders(); // Ensure headers are sent immediately
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.flushHeaders();
+
+  const sendSseMessage = (data) => {
+    if (!res.writableEnded) {
+      // Check if the connection is still open
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    } else {
+      console.warn(
+        `[SSE ${upperCaseTicker}] Attempted to write to closed connection.`
+      );
+    }
+  };
+
+  const endSseResponse = () => {
+    if (!res.writableEnded) {
+      res.end();
+    }
+  };
 
   try {
-    // const cachedData = await redisClient.get(ticker);
+    // check cache first
+    const cachedData = await redisClient.get(cacheKey);
 
-    // if (cachedData) {
-    //   console.log('Serving from cache');
-    //   const parsedData = JSON.parse(cachedData);
+    if (cachedData) {
+      console.log(`[Cache ${upperCaseTicker}] Serving from cache`);
+      try {
+        const parsedData = JSON.parse(cachedData);
 
-    //   for (const [key, value] of Object.entries(parsedData.data)) {
-    //     res.write(`data: ${JSON.stringify({ type: key, data: value })}\n\n`);
-    //   }
+        // Stream cached data back to the client piece by piece
+        // Order matters for frontend display logic
+        const streamOrder = [
+          'stockData',
+          'dcfAnalysis',
+          'aiExplanation',
+          'sentimentOverview',
+          'technicalAnalysis',
+          'optionsChainAnalysis',
+          'insiderSentiment',
+          'comprehensiveRecommendation',
+        ];
 
-    //   res.write(`data: ${JSON.stringify({ type: 'complete' })}\n\n`);
-    //   res.end();
-    //   return;
-    // }
+        for (const key of streamOrder) {
+          if (parsedData[key] !== undefined) {
+            sendSseMessage({ type: key, data: parsedData[key] });
+          }
+        }
 
-    const stockData = await fetchStockData(ticker);
-    res.write(
-      `data: ${JSON.stringify({
-        type: 'stockData',
-        data: stockData.additionalData,
-      })}\n\n`
+        sendSseMessage({ type: 'complete' });
+        endSseResponse();
+        return; // Exit after sending cached data
+      } catch (parseError) {
+        console.error(
+          `[Cache ${upperCaseTicker}] Error parsing cached data:`,
+          parseError
+        );
+        // Optional: Delete invalid cache data
+        // await redisClient.del(cacheKey);
+        // Proceed to fetch fresh data if cache is corrupt
+      }
+    }
+
+    console.log(
+      `[Cache ${upperCaseTicker}] Cache miss. Fetching fresh data...`
     );
+    const resultsToCache = {};
 
-    const dcfResult = await performDCFCalculation(ticker, stockData);
-    res.write(
-      `data: ${JSON.stringify({ type: 'dcfAnalysis', data: dcfResult })}\n\n`
+    // Fetch and stream data, storing results
+    const stockData = await fetchStockData(upperCaseTicker);
+    resultsToCache.stockData = stockData.additionalData; // Cache only needed data
+    sendSseMessage({ type: 'stockData', data: resultsToCache.stockData });
+
+    resultsToCache.dcfAnalysis = await performDCFCalculation(
+      upperCaseTicker,
+      stockData
     );
+    sendSseMessage({ type: 'dcfAnalysis', data: resultsToCache.dcfAnalysis });
 
-    const aiExplanation = await generateAIExplanation(
-      dcfResult,
+    resultsToCache.aiExplanation = await generateAIExplanation(
+      resultsToCache.dcfAnalysis,
       stockData.additionalData
     );
-    res.write(
-      `data: ${JSON.stringify({
-        type: 'aiExplanation',
-        data: aiExplanation,
-      })}\n\n`
-    );
-
-    const sentimentResults = await generateSentimentAnalysis(ticker);
-    res.write(
-      `data: ${JSON.stringify({
-        type: 'sentimentOverview',
-        data: sentimentResults,
-      })}\n\n`
-    );
-
-    const aiTAexplanation = await generateAItechnicalExplanation(
-      stockData.technicalData.indicators,
-      ticker
-    );
-    res.write(
-      `data: ${JSON.stringify({
-        type: 'technicalAnalysis',
-        data: aiTAexplanation,
-      })}\n\n`
-    );
-
-    const optionsChainExplanation = await generateAIOptionsChainExplanation(
-      stockData.optionsChainText
-    );
-    res.write(
-      `data: ${JSON.stringify({
-        type: 'optionsChainAnalysis',
-        data: optionsChainExplanation,
-      })}\n\n`
-    );
-
-    const insiderSentiment = await analyzeInsiderSentiment(
-      ticker,
-      stockData.insiderSentiment
-    );
-    res.write(
-      `data: ${JSON.stringify({
-        type: 'insiderSentiment',
-        data: insiderSentiment,
-      })}\n\n`
-    );
-
-    const parser = createStockAnalysisParser();
-    const chain = createComprehensiveStockAnalysisChain(parser);
-
-    const comprehensiveAnalysis = await chain.invoke({
-      ticker,
-      technicalData: JSON.stringify(stockData.technicalData),
-      financialData: JSON.stringify(stockData.additionalData),
-      sentimentOverview: JSON.stringify(sentimentResults),
-      optionsAnalysis: JSON.stringify(optionsChainExplanation),
-      format_instructions: parser.getFormatInstructions(),
+    sendSseMessage({
+      type: 'aiExplanation',
+      data: resultsToCache.aiExplanation,
     });
 
-    res.write(
-      `data: ${JSON.stringify({
-        type: 'comprehensiveRecommendation',
-        data: comprehensiveAnalysis,
-      })}\n\n`
+    resultsToCache.sentimentOverview = await generateSentimentAnalysis(
+      upperCaseTicker
     );
+    sendSseMessage({
+      type: 'sentimentOverview',
+      data: resultsToCache.sentimentOverview,
+    });
 
-    // const responseData = JSON.stringify({
-    //   type: 'complete',
-    //   data: {
-    //     stockData: stockData.additionalData,
-    //     dcfResult,
-    //     aiExplanation,
-    //     sentimentResults,
-    //     aiTAexplanation,
-    //     optionsChainExplanation,
-    //     insiderSentiment,
-    //     comprehensiveAnalysis,
-    //   },
-    // });
+    resultsToCache.technicalAnalysis = await generateAItechnicalExplanation(
+      stockData.technicalData.indicators,
+      upperCaseTicker
+    );
+    sendSseMessage({
+      type: 'technicalAnalysis',
+      data: resultsToCache.technicalAnalysis,
+    });
 
-    // await redisClient.set(ticker, responseData, { EX: 43200 });
+    resultsToCache.optionsChainAnalysis =
+      await generateAIOptionsChainExplanation(stockData.optionsChainText);
+    sendSseMessage({
+      type: 'optionsChainAnalysis',
+      data: resultsToCache.optionsChainAnalysis,
+    });
 
-    // Finalize the response
-    res.write(`data: ${JSON.stringify({ type: 'complete' })}\n\n`);
-    res.end();
+    resultsToCache.insiderSentiment = await analyzeInsiderSentiment(
+      upperCaseTicker,
+      stockData.insiderSentiment
+    );
+    sendSseMessage({
+      type: 'insiderSentiment',
+      data: resultsToCache.insiderSentiment,
+    });
+
+    // Perform comprehensive analysis
+    const parser = createStockAnalysisParser();
+    const chain = createComprehensiveStockAnalysisChain(parser);
+    resultsToCache.comprehensiveRecommendation = await chain.invoke({
+      ticker: upperCaseTicker,
+      technicalData: JSON.stringify(stockData.technicalData),
+      financialData: JSON.stringify(stockData.additionalData),
+      sentimentOverview: JSON.stringify(resultsToCache.sentimentOverview),
+      optionsAnalysis: JSON.stringify(resultsToCache.optionsChainAnalysis),
+      format_instructions: parser.getFormatInstructions(),
+    });
+    sendSseMessage({
+      type: 'comprehensiveRecommendation',
+      data: resultsToCache.comprehensiveRecommendation,
+    });
+
+    // --- Store results in Cache *before* sending complete ---
+    try {
+      await redisClient.set(
+        cacheKey,
+        JSON.stringify(resultsToCache),
+        'EX',
+        CACHE_TTL_SECONDS
+      );
+      console.log(`[Cache ${upperCaseTicker}] Data stored in cache.`);
+    } catch (cacheError) {
+      console.error(
+        `[Cache ${upperCaseTicker}] Failed to store data in cache:`,
+        cacheError
+      );
+    }
+
+    sendSseMessage({ type: 'complete' });
+    endSseResponse();
   } catch (error) {
-    console.error('Error running stock analysis pipeline:', error.message);
-    res.write(
-      `data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`
+    console.error(
+      `[Error ${upperCaseTicker}] Error running stock analysis pipeline:`,
+      error.message
     );
-    res.end();
+    // Send error message *only if connection is still open*
+    sendSseMessage({
+      type: 'error',
+      message: error.message || 'An unexpected error occurred',
+    });
+    endSseResponse(); // Ensure response is closed on error
   }
 };
 
@@ -338,6 +561,51 @@ const searchSemnaticArticles = async (req, res) => {
   } catch (error) {
     console.error('Error searching stock sentiment:', error);
     res.status(500).json({ error: 'Failed to search stock sentiment' });
+  }
+};
+
+const getRagResponse = async (req, res) => {
+  const { ticker, query } = req.query;
+
+  try {
+    const pineconeIndex = getPineconeIndex();
+    const transcript = await transcriptService.fetchEarningsTranscript(ticker);
+
+    // store the transcript in Pinecone
+    const namespace = await embeddingService.processAndStoreTranscript(
+      transcript,
+      ticker
+    );
+
+    const vectorStore = await PineconeStore.fromExistingIndex(
+      embeddingService.embeddingsModel,
+      { pineconeIndex, namespace }
+    );
+
+    const results = await vectorStore.similaritySearch(query, 5);
+
+    console.log('results', results);
+    const context = results.map((r) => r.pageContent).join('\n\n');
+
+    const prompt = `
+You are a financial analyst. Use the following excerpts from ${ticker}'s latest earnings call to answer the user's question.
+
+Context:
+${context}
+
+User Question:
+${query}
+    `;
+
+    const response = await gptModel.call([new HumanMessage(prompt)]);
+
+    res.json({
+      response: response.content,
+      contextUsed: results,
+    });
+  } catch (err) {
+    console.error('RAG error:', err);
+    res.status(500).json({ error: 'Failed to generate RAG response' });
   }
 };
 
