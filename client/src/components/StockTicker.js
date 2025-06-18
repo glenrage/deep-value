@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const WS_BASE_URL =
   process.env.REACT_APP_NODE_ENV === 'development'
     ? 'ws://localhost:4000'
-    : 'wss://deep-value-production.up.railway.app';
+    : 'wss://deep-value.onrender.com';
 
 const StockTicker = ({ ticker, stream }) => {
   const [price, setPrice] = useState(null);

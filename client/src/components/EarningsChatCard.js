@@ -18,8 +18,7 @@ const EarningsChatCard = ({ ticker }) => {
     setError(null);
     setResponse(null);
 
-    // const backendUrl = process.env.API_URL;
-    const backendUrl = 'https://deep-value-production.up.railway.app';
+    const backendUrl = process.env.REACT_APP_API_URL;
     const apiUrl = `${backendUrl}/api/sentiment/rag?ticker=${encodeURIComponent(
       ticker
     )}&query=${encodeURIComponent(query)}`;

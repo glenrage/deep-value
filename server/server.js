@@ -94,7 +94,7 @@ function setupWebSockets(server) {
   wss = new WebSocket.Server({ server });
 
   wss.on('listening', () => {
-    console.log(`WebSocket server for clients started on port ${server}`);
+    // console.log('WebSocket server for clients started on port 8080');
   });
 
   wss.on('connection', (ws) => {
