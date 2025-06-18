@@ -91,7 +91,7 @@ function setupWebSockets(server) {
   });
 
   // WebSocket Server for Clients
-  wss = new WebSocket.Server({ server });
+  wss = new WebSocket.Server({ port: 8080 });
 
   wss.on('listening', () => {
     // console.log('WebSocket server for clients started on port 8080');
@@ -189,11 +189,11 @@ const startServer = async () => {
     await initializePinecone();
     console.log('Pinecone initialized successfully.');
 
-    const server = app.listen(PORT, () => {
+    app.listen(PORT, () => {
       console.log(`HTTP Server running on port ${PORT}`);
     });
 
-    setupWebSockets(server);
+    setupWebSockets();
   } catch (error) {
     console.error('Failed to start the server:', error);
     process.exit(1);
