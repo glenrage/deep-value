@@ -14,6 +14,13 @@ const PORT = process.env.PORT || 4000;
 app.use(cors());
 app.use(express.json());
 
+app.use(
+  cors({
+    origin: ['http://localhost:3000', 'https://glenrage.github.io/deep-value'],
+    credentials: true,
+  })
+);
+
 const stockRoutes = require('./routes/stockRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const sentimentRoutes = require('./routes/sentimentRoutes');
@@ -33,7 +40,7 @@ let clients = [];
 let isAuthenticated = false;
 let subscribedTickers = new Set();
 
-function setupWebSockets() {
+function setupWebSockets(server) {
   alpacaWs = new WebSocket('wss://stream.data.alpaca.markets/v2/iex');
 
   alpacaWs.on('open', () => {
@@ -91,7 +98,7 @@ function setupWebSockets() {
   });
 
   // WebSocket Server for Clients
-  wss = new WebSocket.Server({ port: 8080 });
+  wss = new WebSocket.Server({ server });
 
   wss.on('listening', () => {
     // console.log('WebSocket server for clients started on port 8080');
@@ -189,11 +196,11 @@ const startServer = async () => {
     await initializePinecone();
     console.log('Pinecone initialized successfully.');
 
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`HTTP Server running on port ${PORT}`);
     });
 
-    setupWebSockets();
+    setupWebSockets(server);
   } catch (error) {
     console.error('Failed to start the server:', error);
     process.exit(1);

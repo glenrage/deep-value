@@ -1,4 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+
+const WS_BASE_URL =
+  process.env.REACT_APP_NODE_ENV === 'development'
+    ? 'ws://localhost:4000'
+    : 'wss://deep-value-production.up.railway.app';
 
 const StockTicker = ({ ticker, stream }) => {
   const [price, setPrice] = useState(null);
@@ -11,7 +16,7 @@ const StockTicker = ({ ticker, stream }) => {
     let reconnectInterval;
 
     const connectWebSocket = () => {
-      ws = new WebSocket('ws://localhost:8080');
+      ws = new WebSocket(WS_BASE_URL);
 
       ws.onopen = () => {
         console.log('Connected to WebSocket');
