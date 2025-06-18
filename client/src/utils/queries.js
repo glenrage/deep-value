@@ -2,12 +2,12 @@ import axios from 'axios';
 
 let BASE_URL;
 
-if (process.env.NODE_ENV === 'development') {
-  BASE_URL = 'http://localhost:4000';
+if (process.env.REACT_APP_NODE_ENV === 'development') {
+  BASE_URL = process.env.REACT_APP_LOCAL_API_URL;
 } else {
-  BASE_URL = 'https://deep-value.onrender.com';
+  BASE_URL = process.env.REACT_APP_API_URL;
 }
-
+console.log({ BASE_URL });
 export const fetchFullStockAnalysis = (ticker, onMessage, onError) => {
   let isComplete = false;
 
