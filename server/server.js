@@ -16,7 +16,7 @@ app.use(express.json());
 
 app.use(
   cors({
-    origin: ['http://localhost:3000', 'https://glenrage.github.io/deep-value'],
+    origin: ['http://localhost:3000', 'https://glenrage.github.io'],
     credentials: true,
   })
 );
