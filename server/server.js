@@ -11,15 +11,14 @@ const { initializePinecone } = require('./services/pineCone');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
-app.use(express.json());
-
 app.use(
   cors({
     origin: ['http://localhost:3000', 'https://glenrage.github.io'],
     credentials: true,
   })
 );
+
+app.use(express.json());
 
 const stockRoutes = require('./routes/stockRoutes');
 const aiRoutes = require('./routes/aiRoutes');
