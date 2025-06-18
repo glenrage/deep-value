@@ -14,13 +14,6 @@ const PORT = process.env.PORT || 4000;
 app.use(cors());
 app.use(express.json());
 
-app.use(
-  cors({
-    origin: ['http://localhost:3000', 'https://glenrage.github.io'],
-    credentials: true,
-  })
-);
-
 const stockRoutes = require('./routes/stockRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const sentimentRoutes = require('./routes/sentimentRoutes');
@@ -101,7 +94,7 @@ function setupWebSockets(server) {
   wss = new WebSocket.Server({ server });
 
   wss.on('listening', () => {
-    // console.log('WebSocket server for clients started on port 8080');
+    console.log(`WebSocket server for clients started on port ${server}`);
   });
 
   wss.on('connection', (ws) => {
