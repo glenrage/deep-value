@@ -111,3 +111,24 @@ export const searchSemanticArticles = async (query) => {
     throw error;
   }
 };
+
+// Perform a semantic search for similar articles
+export const requestQuickSnapshot = async (queryInput, chatHistory) => {
+  try {
+    const response = await fetch(`${BASE_URL}/api/agent/quick-snapshot`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: queryInput,
+        history: chatHistory,
+      }),
+    });
+
+    return response;
+  } catch (error) {
+    console.error('Error fetching similar articles:', error);
+    throw error;
+  }
+};
