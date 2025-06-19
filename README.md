@@ -2,113 +2,104 @@
 
 ## Overview
 
-**Deep Value** is a full-stack application designed to determine a stock's intrinsic value using an AI-enhanced Discounted Cash Flow (DCF) model. It integrates LangChain for dynamic workflows, providing users with detailed stock valuation, AI-driven option chain insights, AI-driven technical analysis and AI-driven news and insider transaction sentiment analysis.
+**Deep Value** is a full-stack application designed to determine a stock's intrinsic value using an AI-enhanced Discounted Cash Flow (DCF) model. It integrates LangChain for dynamic workflows, providing users with detailed stock valuation, AI-driven option chain insights, AI-driven technical analysis, AI-driven news sentiment analysis, and an autonomous agent for quick stock snapshots.
 
 ![Image Description](flow.png)
 
 ## Key Features
 
-1. **Stock Data Retrieval**
+1.  **Stock Data Retrieval**
 
-   - Fetches the latest financial data for a given stock ticker.
-   - Collects recent insider transaction data to assess insider sentiment.
-   - Fetches options chain for analysis
-   - **APIs**: Financial Modeling Prep, Yahoo Finance, FinnHub.
+    - Fetches latest financial data, insider transactions, and options chains.
+    - **APIs**: Financial Modeling Prep, Yahoo Finance, FinnHub (or other provider for insider data).
 
-2. **Custom DCF Model Service (AI-Enhanced)**
+2.  **Custom DCF Model Service (AI-Enhanced Explanations)**
 
-   - Calculates a stock's intrinsic value using a DCF model.
-   - Incorporates AI-predicted inputs such as growth rates and profit margins.
-   - Provides average, best, and worst-case scenarios with AI-driven explanations.
+    - Calculates intrinsic value using a DCF model with data-derived inputs.
+    - Provides average, best, and worst-case scenarios with AI-driven explanations of the results.
 
-3. **AI Service (ChatGPT Integration)**
+3.  **AI Services (OpenAI Integration)**
 
-   - Uses OpenAI’s GPT-4 to analyze and provide enhanced insights on DCF results and other stock valuation data.
-   - Provides AI-generated recommendations, explanations, and analysis based on the computed stock data.
-   - **Tech Stack**: OpenAI’s GPT API integration.
+    - Utilizes OpenAI's GPT models (e.g., GPT-3.5-turbo) for analysis and insights.
+    - Generates explanations for DCF, technical analysis, options chains, and synthesizes agent responses.
 
-4. **Sentiment Analysis Module**
+4.  **Sentiment Analysis Module**
 
-   - Scrapes news, social media, and earnings call transcripts to assess overall sentiment regarding the stock.
-   - Integrates sentiment data to adjust the DCF model's inputs and predict future growth.
-   - Analyzes insider sentiment trends based on recent insider transactions.
-   - **Tech Stack**: Natural Language Processing (NLP) libraries such as Hugging Face, and web scraping APIs.
+    - Analyzes sentiment of financial news articles using LLMs.
+    - Scrapes earnings call transcripts for an AI-powered Q&A feature.
+    - _(Note: Social media scraping and direct sentiment adjustment of DCF inputs are potential future enhancements.)_
 
-5. **Embeddings and Vector Database Integration**
+5.  **Embeddings and Vector Database Integration (Pinecone)**
 
-   - Converts news article content for similarity search.
-   - Uses embeddings to identify market patterns, trends, and perform semantic searches for deeper insights.
-   - **Tech Stack**: Pinecone
+    - Converts news articles and earnings transcripts into vector embeddings using OpenAI models.
+    - Stores embeddings in Pinecone for semantic search and Retrieval Augmented Generation (RAG).
 
-6. **Data Storage and Message Queue**
+6.  **Data Storage and Message Queue (Redis/BullMQ)**
 
-   - Implements a message queue to offload non-critical tasks, such as storing embeddings, to background workers for faster processing and reduced latency.
-   - Uses a redis cache if the same ticker symbol is used for efficency
-   - **Tech Stack**: Redis/Bull
+    - Offloads embedding storage to background workers via BullMQ and Redis, enhancing API responsiveness.
+    - _(Note: General API response caching with Redis is a potential future enhancement.)_
 
-7. **LangChain Integration**
+7.  **LangChain Integration & Autonomous Agent**
+    - Leverages LangChain.js for LLM interaction, prompt management, document processing, vector store operations, and agent creation.
+    - Features an **Autonomous "Quick Stock Snapshot" Agent** that can understand user requests, utilize multiple tools to fetch real-time data (price, news sentiment, technical analysis), and synthesize a concise summary.
 
-   - **Dynamic Workflow**: Utilizes LangChain to connect AI models, stock APIs, and backend systems for a cohesive analysis workflow.
-   - **Complex Query Management**: Facilitates seamless chaining of multiple API calls and AI model predictions.
-   - **Tech Stack**: LangChain.js
+## LangChain Integration: Enhancing AI Workflows
 
-   ## LangChain Integration: Enhancing AI Workflows
-
-This application leverages LangChain.js to streamline and enhance interactions with Large Language Models (LLMs) and vector databases. Here's how it's integrated:
+This application leverages LangChain.js to streamline and enhance interactions with Large Language Models (LLMs), vector databases, and to build autonomous agents. Here's how it's integrated:
 
 1.  **LLM Interaction for Sentiment Analysis & Explanations:**
 
-    - **Prompt Management:** LangChain's `HumanMessagePromptTemplate` and `SystemMessagePromptTemplate` are used in `services/sentimentService.js` (and could be adopted in `services/openaiService.js`) to create structured and reusable prompts for tasks like:
-      - Analyzing the sentiment of news articles.
-      - Generating AI-driven explanations for DCF results, technical analysis, and options chain data.
-    - **Simplified LLM Calls:** `ChatOpenAI` from `@langchain/openai` provides a consistent interface to interact with OpenAI models (like GPT-3.5-turbo), abstracting away some of_the direct API call complexities.
+    - **Prompt Management:** LangChain's `ChatPromptTemplate` and `MessagesPlaceholder` construct dynamic and structured prompts for tasks like analyzing news sentiment or generating explanations for financial data.
+    - **Simplified LLM Calls:** `ChatOpenAI` from `@langchain/openai` provides a consistent interface to interact with OpenAI models.
 
 2.  **Document Processing for Embeddings & RAG:**
 
-    - **Text Splitting:** For long documents like earnings call transcripts, `RecursiveCharacterTextSplitter` from LangChain (`services/embeddingService.js`) is used to break down the text into manageable chunks suitable for creating embeddings. This is crucial for staying within the token limits of embedding models.
-    - **Vector Store Interaction:** LangChain's `PineconeStore` (from `@langchain/pinecone`) facilitates the process of:
-      - Creating embeddings from text documents (news articles, transcript chunks) using models like OpenAI's `text-embedding-ada-002`.
-      - Storing these embeddings along with their metadata in the Pinecone vector database.
-      - Querying Pinecone for semantically similar documents (as seen in `services/sentimentService.js`'s `querySimliarArticles` and potentially for RAG in `EarningsChatCard`).
+    - **Text Splitting:** `RecursiveCharacterTextSplitter` breaks down earnings call transcripts into manageable chunks for embedding.
+    - **Vector Store Interaction:** LangChain's `PineconeStore` (or direct Pinecone SDK usage facilitated by LangChain concepts) manages the creation of embeddings from text (news, transcripts) and their storage in Pinecone. This also powers querying for semantically similar documents.
 
 3.  **Foundation for Retrieval Augmented Generation (RAG):**
 
-    - The embeddings stored via LangChain are fundamental for RAG. When a user asks a question about an earnings call (in `EarningsChatCard`), the application can:
-      1.  Embed the user's query.
-      2.  Use LangChain (or direct Pinecone queries informed by LangChain's structuring) to retrieve relevant chunks from the stored earnings transcript embeddings.
-      3.  Feed these retrieved chunks, along with the original query, into an LLM to generate a contextually relevant answer.
-    - This allows the LLM to answer questions based on specific information within the documents, rather than just its general knowledge.
+    - The stored embeddings are fundamental for the RAG feature in the `EarningsChatCard`. User queries are embedded, relevant transcript chunks are retrieved from Pinecone, and both are passed to an LLM for context-aware answers.
 
-4.  **Potential for Advanced Agentic Workflows (Future Enhancement):**
-    - While not extensively used in the current version for complex API chaining, LangChain's concepts of "Chains," "Tools," and "Agents" provide a powerful framework for future enhancements. For example, an Agent could be developed to:
-      - Dynamically decide which financial APIs to call based on a user query.
-      - Process the results from multiple APIs.
-      - Summarize findings or feed them into another LLM call for a comprehensive report.
+4.  **Autonomous Agent for "Quick Stock Snapshot":**
+    - **Agent Creation:** The application uses LangChain's `createOpenAIFunctionsAgent` and `AgentExecutor` to build an autonomous agent.
+    - **Tools:** The agent is equipped with custom tools (built using `DynamicTool`) that wrap existing backend services to:
+      - Fetch current stock prices.
+      - Get summaries of recent news sentiment.
+      - Retrieve key technical analysis signals.
+    - **Decision Making:** The LLM, guided by a system prompt, analyzes the user's request for a stock snapshot. It then autonomously decides which tool(s) to call and in what sequence to gather the necessary information.
+    - **Information Synthesis:** After executing the tools, the agent receives their outputs (observations) and uses the LLM to synthesize these diverse data points into a single, coherent, and concise summary for the user.
+    - This demonstrates an end-to-end agentic workflow where the AI can orchestrate multiple data retrieval tasks and reason over the results.
 
-By using LangChain, the application benefits from modular components, easier integration with LLMs and vector stores, and a clear path for building more sophisticated AI-powered data analysis features.
+By using LangChain, the app benefits from modular components, easier integration with LLMs and vector stores, a clear path for building more sophisticated AI-powered features, and the ability to create autonomous agents that can interact with defined tools.
+
+## Security Considerations: Basic Prompt Injection Defense
+
+While robust prompt injection defense is an ongoing challenge in AI security, this application implements basic measures for the "Quick Stock Snapshot" agent:
+
+1.  **Input Sanitization:** User queries to the agent are passed through a `sanitizeInput` function which:
+    - Checks for common keywords and phrases often used in prompt injection attempts (e.g., "ignore previous instructions," "reveal your system prompt").
+    - Enforces a maximum length for user input to prevent overly long or complex injection payloads.
+2.  **System Prompt Reinforcement:** The system prompt for the agent explicitly instructs it to:
+    - Stick to its designated task (providing stock snapshots).
+    - Not follow user instructions that try to override its core directives or ask it to roleplay.
+    - Politely refuse off-topic requests.
+
+These measures provide a foundational layer of defense, though it's acknowledged that sophisticated attacks may still be possible. In a production environment with sensitive operations, more advanced detection models, output validation, and human oversight would be considered.
 
 ## Installation
 
-1. Clone the repository.
-2. Ensure you are in the root director:
-3. Install dependencies
+1.  Clone the repository.
+2.  Ensure you are in the root directory. (It's generally better to specify installing dependencies in `server` and `client` directories separately).
+    - Navigate to the `server` directory: `cd server`
+    - Install server dependencies: `npm install`
+    - Navigate to the `client` directory: `cd ../client`
+    - Install client dependencies: `npm install`
+    - (Or, if `npm install:all` is a script in your root `package.json` that does this, keep it).
+3.  Set up your `.env` file in the `server` directory with necessary API keys (OpenAI, Pinecone, market data provider).
+4.  Start the application:
+    - In one terminal (from the root or `server` directory): `npm run dev:server` (or your command to start the backend with Nodemon)
+    - In another terminal (from the `client` directory): `npm start` (or your command to start the React client)
+    - Alternatively, if your root `npm run dev` script handles both: `npm run dev` (from the root directory)
 
-   ```
-   npm install:all
-   ```
-
-4. Start the app, preferably in two terminal windows
-
-   ```
-   npm run dev:server
-   ```
-
-   ```
-   npm run dev:client
-   ```
-
-   or run to start client and server in a single terminal
-
-   ```
-   npm run dev
-   ```
+---

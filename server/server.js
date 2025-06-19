@@ -1,6 +1,7 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
+const http = require('http');
 const WebSocket = require('ws');
 
 dotenv.config();
@@ -27,174 +28,252 @@ app.get('/', (req, res) => {
   res.send('Stock server says hi!');
 });
 
-// --- WebSocket Setup (Alpaca & Client Server) ---
-let alpacaWs;
-let wss; // WebSocket server for clients
-let clients = [];
-let isAuthenticated = false;
-let subscribedTickers = new Set();
+let finnhubWs; // WebSocket connection to Finnhub
+let clientWss; // WebSocket server for frontend clients
+let currentFinnhubTicker = null; // Tracks the single ticker currently subscribed to Finnhub
 
-function setupWebSockets() {
-  alpacaWs = new WebSocket('wss://stream.data.alpaca.markets/v2/iex');
+function connectToFinnhub() {
+  console.log('[FinnhubWS] Attempting to connect...');
+  if (
+    finnhubWs &&
+    (finnhubWs.readyState === WebSocket.OPEN ||
+      finnhubWs.readyState === WebSocket.CONNECTING)
+  ) {
+    console.log(
+      '[FinnhubWS] Already connected or connecting. Aborting new connection attempt.'
+    );
+    return;
+  }
 
-  alpacaWs.on('open', () => {
-    // console.log('Connected to Alpaca WebSocket');
-    const authMessage = JSON.stringify({
-      action: 'auth',
-      key: process.env.ALPACA_KEY_ID,
-      secret: process.env.ALPACA_SECRET_KEY,
-    });
-    alpacaWs.send(authMessage);
+  const finnhubUrl = `wss://ws.finnhub.io?token=${process.env.FINNHUB_API_KEY}`;
+  finnhubWs = new WebSocket(finnhubUrl);
+
+  finnhubWs.on('open', () => {
+    console.log('[FinnhubWS] Connection opened successfully with Finnhub.');
+    // If there was a ticker requested before connection, subscribe to it now
+    if (currentFinnhubTicker) {
+      subscribeToFinnhubTicker(currentFinnhubTicker);
+    }
   });
 
-  alpacaWs.on('message', (data) => {
+  finnhubWs.on('message', (data) => {
     try {
-      const parsedData = JSON.parse(data);
+      const messageBuffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
+      const parsedMessage = JSON.parse(messageBuffer.toString());
 
-      if (Array.isArray(parsedData)) {
-        parsedData.forEach((message) => {
-          if (message.T === 'success' && message.msg === 'authenticated') {
-            isAuthenticated = true;
-            // console.log('Successfully authenticated with Alpaca');
-            // Resubscribe if needed after reconnect/auth
-            resubscribeAllTickers();
-          } else if (message.T === 'error') {
-            // console.error('Alpaca Auth/Subscription Error:', message.msg);
-          } else if (message.T === 'subscription') {
-            // console.log('Alpaca Subscription Update:', message);
-          } else if (message.T === 't') {
-            // Trade update
+      if (parsedMessage.type === 'trade' && parsedMessage.data) {
+        parsedMessage.data.forEach((trade) => {
+          // Only broadcast if it matches the currently subscribed ticker
+          if (trade.s === currentFinnhubTicker) {
             const tradeUpdate = {
               type: 'trade_update',
-              ticker: message.S,
-              price: parseFloat(message.p),
-              timestamp: new Date(message.t).toISOString(),
+              ticker: trade.s,
+              price: parseFloat(trade.p),
+              timestamp: new Date(trade.t).toISOString(),
+              volume: trade.v,
             };
-            // console.log('Trade Update:', tradeUpdate);
             broadcastToClients(tradeUpdate);
           }
         });
+      } else if (parsedMessage.type === 'ping') {
+        if (finnhubWs.readyState === WebSocket.OPEN) {
+          finnhubWs.send(JSON.stringify({ type: 'pong' }));
+        }
       }
     } catch (e) {
-      console.error('Failed to parse Alpaca message:', e);
+      console.error(
+        '[FinnhubWS] Failed to parse message or error in message handler:',
+        data.toString(),
+        e
+      );
     }
   });
 
-  alpacaWs.on('error', (err) => {
-    console.error('Alpaca WebSocket error:', err);
+  finnhubWs.on('error', (err) =>
+    console.error('[FinnhubWS] WebSocket error:', err.message)
+  );
+
+  finnhubWs.on('close', (code, reason) => {
+    const reasonString = reason ? reason.toString() : 'No reason provided';
+    console.log(
+      `[FinnhubWS] WebSocket connection closed. Code: ${code}, Reason: "${reasonString}". Attempting to reconnect Finnhub in 5s...`
+    );
+    finnhubWs = null;
+    // currentFinnhubTicker remains, so it will be resubscribed on reconnect
+    setTimeout(connectToFinnhub, 5000);
   });
+}
 
-  alpacaWs.on('close', () => {
-    // console.log('Alpaca WebSocket closed. Attempting to reconnect...');
-    isAuthenticated = false;
-    // Implement reconnection logic if desired (e.g., using setTimeout with backoff)
-    setTimeout(setupWebSockets, 5000); // Simple reconnect attempt after 5s
-  });
+// --- Client-Facing WebSocket Server Setup (Called ONCE) ---
+function setupClientWebSocketServer(httpServer) {
+  if (clientWss) {
+    console.warn(
+      '[ClientWS] Client-facing WebSocket server already initialized.'
+    );
+    return;
+  }
+  console.log('[ClientWS] Initializing client-facing WebSocket server...');
+  clientWss = new WebSocket.Server({ server: httpServer });
+  console.log('[ClientWS] Server configured (attached to HTTP server).');
 
-  // WebSocket Server for Clients
-  wss = new WebSocket.Server({ port: 8080 });
-
-  wss.on('listening', () => {
-    // console.log('WebSocket server for clients started on port 8080');
-  });
-
-  wss.on('connection', (ws) => {
-    // console.log('Client connected to WebSocket server');
-    clients.push(ws);
+  clientWss.on('connection', (ws, req) => {
+    const clientIp =
+      req.socket.remoteAddress ||
+      req.headers['x-forwarded-for'] ||
+      'Unknown IP';
+    console.log(
+      `[ClientWS] Client connected. IP: ${clientIp}. Total clients: ${clientWss.clients.size}`
+    );
 
     ws.on('message', (message) => {
       try {
-        const data = JSON.parse(message);
-        // console.log('Received from client:', data);
+        const messageBuffer = Buffer.isBuffer(message)
+          ? message
+          : Buffer.from(message);
+        const data = JSON.parse(messageBuffer.toString());
         if (data.type === 'subscribe' && data.ticker) {
-          subscribeToTicker(data.ticker.toUpperCase(), ws); // Standardize ticker
+          handleClientSubscriptionRequest(data.ticker.toUpperCase(), ws);
+        } else if (data.type === 'unsubscribe' && data.ticker) {
+          // Unsubscribe is trickier with a single global ticker; if one client unsubscribes,
+          // others might still want it. For simplicity, we can ignore client unsubs for now,
+          // or clear currentFinnhubTicker if NO clients are connected.
+          console.log(
+            `[ClientWS] Received unsubscribe for ${data.ticker}. Currently not acting on individual client unsubs.`
+          );
         }
       } catch (e) {
-        console.error('Failed to parse client message:', e);
+        console.error(
+          '[ClientWS] Failed to parse client message:',
+          message.toString(),
+          e
+        );
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(
+            JSON.stringify({
+              type: 'error',
+              message: 'Invalid message format.',
+            })
+          );
+        }
       }
     });
-
-    ws.on('close', () => {
-      clients = clients.filter((client) => client !== ws);
-      console.log('Client disconnected');
-      // Optional: Unsubscribe tickers if no clients are listening?
+    ws.on('close', (code, reason) => {
+      console.log(
+        `[ClientWS] Client disconnected. Total clients: ${clientWss.clients.size}`
+      );
+      if (clientWss.clients.size === 0 && currentFinnhubTicker) {
+        console.log(
+          '[FinnhubWS] Last client disconnected. Unsubscribing from Finnhub ticker:',
+          currentFinnhubTicker
+        );
+        unsubscribeFromFinnhubTicker(currentFinnhubTicker);
+        currentFinnhubTicker = null;
+      }
     });
-
-    ws.on('error', (error) => {
-      // console.error('Client WebSocket error:', error);
-      // Remove problematic client
-      clients = clients.filter((client) => client !== ws);
-    });
+    ws.on('error', (error) =>
+      console.error('[ClientWS] Error on a client WebSocket:', error.message)
+    );
   });
-
-  wss.on('error', (error) => {
-    console.error('WebSocket Server Error:', error);
-  });
+  clientWss.on('error', (error) =>
+    console.error('[ClientWS] Main Client WebSocket Server error:', error)
+  );
 }
 
+// --- Broadcasting and Subscription Logic ---
 function broadcastToClients(data) {
+  if (!clientWss || clientWss.clients.size === 0) return;
   const messageString = JSON.stringify(data);
-  clients.forEach((client) => {
+  clientWss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
-      client.send(messageString);
+      try {
+        client.send(messageString);
+      } catch (e) {
+        console.error('[ClientWS] Error sending to a client:', e.message);
+      }
     }
   });
 }
 
-function subscribeToTicker(ticker, ws) {
-  // ws parameter might not be needed if just adding to global set
-  if (!isAuthenticated) {
-    console.log(
-      `Alpaca not authenticated yet. Queueing subscription for ${ticker}.`
+function handleClientSubscriptionRequest(requestedTicker, wsClient) {
+  console.log(
+    `[ClientWS] Client requested subscription to ${requestedTicker}. Current Finnhub ticker: ${currentFinnhubTicker}`
+  );
+  if (wsClient.readyState === WebSocket.OPEN) {
+    wsClient.send(
+      JSON.stringify({
+        type: 'status',
+        ticker: requestedTicker,
+        message: `Processing subscription for ${requestedTicker}...`,
+      })
     );
-    // Optionally inform the client they are queued
-    // ws.send(JSON.stringify({ type: 'status', message: `Subscription for ${ticker} queued.`}));
-    // Check periodically or rely on auth success callback to subscribe pending tickers
-    return;
   }
 
-  if (subscribedTickers.has(ticker)) {
-    // console.log(`${ticker} is already subscribed to Alpaca.`);
-    // Optionally inform the client they are now receiving data
-    // ws.send(JSON.stringify({ type: 'status', message: `Already subscribed to ${ticker}.`}));
-    return;
+  if (currentFinnhubTicker !== requestedTicker) {
+    console.log(
+      `[FinnhubWS] Requested ticker ${requestedTicker} is different from current ${currentFinnhubTicker}. Changing subscription.`
+    );
+    if (currentFinnhubTicker) {
+      unsubscribeFromFinnhubTicker(currentFinnhubTicker);
+    }
+    currentFinnhubTicker = requestedTicker;
+    subscribeToFinnhubTicker(currentFinnhubTicker);
+  } else {
+    console.log(
+      `[FinnhubWS] Already subscribed to ${requestedTicker} on Finnhub.`
+    );
   }
 
-  // console.log(`Attempting to subscribe to Alpaca trades for ${ticker}`);
-  const subscribeMessage = JSON.stringify({
-    action: 'subscribe',
-    trades: [ticker],
-    // quotes: [ticker] // Add quotes if needed
-    // bars: [ticker] // Add bars if needed
-  });
-
-  alpacaWs.send(subscribeMessage);
-  subscribedTickers.add(ticker); // Add to set *after* sending request (or upon confirmation)
-  // Confirmation comes via 'subscription' message from Alpaca
+  if (wsClient.readyState === WebSocket.OPEN) {
+    wsClient.send(
+      JSON.stringify({
+        type: 'status',
+        ticker: requestedTicker,
+        message: `Now listening for ${requestedTicker} updates.`,
+      })
+    );
+  }
 }
 
-function resubscribeAllTickers() {
-  if (!isAuthenticated) return;
-  if (subscribedTickers.size === 0) return;
+function subscribeToFinnhubTicker(ticker) {
+  if (!ticker) return;
+  if (finnhubWs && finnhubWs.readyState === WebSocket.OPEN) {
+    const subscribeMsg = JSON.stringify({ type: 'subscribe', symbol: ticker });
+    console.log(
+      `[FinnhubWS] Sending subscribe message to Finnhub: ${subscribeMsg}`
+    );
+    finnhubWs.send(subscribeMsg);
+  } else {
+    console.warn(
+      `[FinnhubWS] Not connected to Finnhub. ${ticker} will be subscribed upon connection.`
+    );
+    // currentFinnhubTicker is already set, so connectToFinnhub will handle it on 'open'
+  }
+}
 
-  // console.log('Resubscribing to tickers:', Array.from(subscribedTickers));
-  const subscribeMessage = JSON.stringify({
-    action: 'subscribe',
-    trades: Array.from(subscribedTickers),
-  });
-  alpacaWs.send(subscribeMessage);
+function unsubscribeFromFinnhubTicker(ticker) {
+  if (!ticker) return;
+  if (finnhubWs && finnhubWs.readyState === WebSocket.OPEN) {
+    const unsubscribeMsg = JSON.stringify({
+      type: 'unsubscribe',
+      symbol: ticker,
+    });
+    console.log(
+      `[FinnhubWS] Sending unsubscribe message to Finnhub: ${unsubscribeMsg}`
+    );
+    finnhubWs.send(unsubscribeMsg);
+  }
 }
 
 const startServer = async () => {
   try {
     await initializePinecone();
     console.log('Pinecone initialized successfully.');
-
-    app.listen(PORT, () => {
-      console.log(`HTTP Server running on port ${PORT}`);
+    const httpServer = http.createServer(app);
+    setupClientWebSocketServer(httpServer);
+    connectToFinnhub();
+    httpServer.listen(PORT, () => {
+      console.log(`HTTP and WebSocket Server running on port ${PORT}`);
     });
-
-    // setupWebSockets();
   } catch (error) {
     console.error('Failed to start the server:', error);
     process.exit(1);
@@ -202,3 +281,35 @@ const startServer = async () => {
 };
 
 startServer();
+
+// --- Graceful Shutdown Logic ---
+function gracefulShutdown(signal) {
+  console.log(`Received ${signal}. Starting graceful shutdown...`);
+  // Simplified shutdown logic
+  if (finnhubWs && finnhubWs.readyState === WebSocket.OPEN) {
+    console.log('[FinnhubWS] Closing Finnhub connection...');
+    finnhubWs.removeAllListeners('close'); // Prevent auto-reconnect during shutdown
+    finnhubWs.close(1000, `Server shutdown: ${signal}`);
+  }
+  if (clientWss) {
+    console.log('[ClientWS] Closing client connections and server...');
+    clientWss.clients.forEach((client) =>
+      client.close(1000, `Server shutdown: ${signal}`)
+    );
+    clientWss.close(() => {
+      console.log('[ClientWS] Server closed.');
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
+  // Fallback exit
+  setTimeout(() => {
+    console.error('Graceful shutdown timeout. Forcing exit.');
+    process.exit(1);
+  }, 3000);
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2'));

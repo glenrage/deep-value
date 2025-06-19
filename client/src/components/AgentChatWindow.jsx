@@ -66,6 +66,9 @@ const AgentChatWindow = () => {
 
   return (
     <Card className="w-full max-w-lg mx-auto mt-4">
+      <h3 className="text-xl font-semibold mb-2 text-center text-gray-700">
+        Quick Snapshot Agent
+      </h3>
       <div className="flex flex-col h-[400px] overflow-y-auto p-4 space-y-2 border rounded-t-lg bg-gray-50">
         {messages.map((msg, index) => (
           <div
