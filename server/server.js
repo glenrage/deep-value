@@ -1,4 +1,3 @@
-// server.js
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
@@ -17,10 +16,12 @@ app.use(express.json());
 const stockRoutes = require('./routes/stockRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const sentimentRoutes = require('./routes/sentimentRoutes');
+const agentRoutes = require('./routes/agentRoutes');
 
 app.use('/api/stocks', stockRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/sentiment', sentimentRoutes);
+app.use('/api/agent', agentRoutes);
 
 app.get('/', (req, res) => {
   res.send('Stock server says hi!');
@@ -193,7 +194,7 @@ const startServer = async () => {
       console.log(`HTTP Server running on port ${PORT}`);
     });
 
-    setupWebSockets();
+    // setupWebSockets();
   } catch (error) {
     console.error('Failed to start the server:', error);
     process.exit(1);

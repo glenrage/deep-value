@@ -7,8 +7,9 @@ import {
   ComprehensiveAnalysisCard,
   SentimentAnalysisCard,
 } from './AnalysisCards';
-import { StockTicker } from './StockTicker';
+// import { StockTicker } from './StockTicker';
 import { EarningsChatCard } from './EarningsChatCard';
+import { AgentChatWindow } from './AgentChatWindow';
 
 const StockAnalysis = () => {
   const [ticker, setTicker] = useState('');
@@ -154,6 +155,13 @@ const StockAnalysis = () => {
         />
 
         <EarningsChatCard ticker={currentTicker} key={currentTicker} />
+
+        <div className="mt-8">
+          <h3 className="text-xl font-semibold mb-2 text-center text-gray-700">
+            Quick Snapshot Agent
+          </h3>
+          <AgentChatWindow />
+        </div>
 
         {!currentTicker && !fetching && (
           <p className="text-center text-gray-500 dark:text-gray-400 mt-10">
