@@ -1,196 +1,217 @@
+import React from 'react';
 import { Card, Spinner } from 'flowbite-react';
+import {
+  HiInformationCircle,
+  HiUserGroup,
+  HiCurrencyDollar,
+  HiBeaker,
+  HiAcademicCap,
+} from 'react-icons/hi';
 
-const AnalysisCard = ({ title, data, loading }) => (
-  <Card className="w-full mt-4 border border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-300 h-96 bg-white">
-    <h4 className="text-lg font-semibold mb-1 text-blue-800">{title}</h4>
-    {loading ? (
-      <div className="flex justify-center items-center h-full">
-        <Spinner
-          aria-label={`Loading ${title}`}
-          size="xl"
-          className="animate-spin"
-          color="success"
-        />
-      </div>
-    ) : (
-      <div className="mt-2 h-full overflow-y-auto pr-2">
-        {data ? (
-          typeof data === 'string' ? (
-            data.split('\n').map((line, index) => (
-              <p
-                key={index}
-                className={`text-sm ${
-                  line.startsWith('-') ? 'font-semibold' : ''
-                } text-gray-700`}
-              >
-                {line.startsWith('-') ? line.substring(1).trim() : line}
-              </p>
-            ))
-          ) : (
-            <pre className="text-sm whitespace-pre-wrap text-gray-700">
-              {JSON.stringify(data, null, 2)}
-            </pre>
-          )
-        ) : (
-          <p className="text-sm text-gray-500">No data available</p>
-        )}
-      </div>
-    )}
+const LoadingState = ({ title = 'Data' }) => (
+  <div className="flex flex-col justify-center items-center h-full min-h-[150px] text-slate-400">
+    <Spinner size="lg" color="info" aria-label={`Loading ${title}`} />
+    <p className="ml-3 mt-2 text-sm">Loading {title.toLowerCase()}...</p>
+  </div>
+);
+
+const NoDataState = ({ message = 'No data available for this analysis.' }) => (
+  <div className="flex flex-col justify-center items-center h-full min-h-[150px] text-slate-500">
+    <HiInformationCircle className="w-10 h-10 mb-3" />
+    <p className="text-sm">{message}</p>
+  </div>
+);
+
+// Base Card structure for all analysis cards
+const BaseAnalysisCard = ({ title, icon, children, className = '' }) => (
+  <Card
+    className={`bg-slate-800/60 border border-slate-700 shadow-xl rounded-xl flex flex-col h-96 transition-all duration-300 hover:shadow-sky-500/20 hover:border-sky-600/70 ${className}`}
+  >
+    <div className="flex items-center text-sky-400 p-2 border-b border-slate-700">
+      {icon &&
+        React.cloneElement(icon, { className: 'w-6 h-6 mr-3 flex-shrink-0' })}
+      <h3 className="text-lg font-semibold truncate" title={title}>
+        {title}
+      </h3>
+    </div>
+    <div className="p-2 flex-grow overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-700/50">
+      {children}
+    </div>
   </Card>
 );
 
-const DCFAnalysisCard = ({ title, data, loading }) => (
-  <Card className="w-full mt-4 border border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-300 h-96 bg-white">
-    <h5 className="text-lg font-semibold mb-1 text-blue-800">{title}</h5>
+// Generic Analysis Card (for AI Explanations, Technical, Insider, Options)
+export const AnalysisCard = ({ title, data, loading, icon = <HiBeaker /> }) => (
+  <BaseAnalysisCard title={title} icon={icon}>
     {loading ? (
-      <div className="flex justify-center items-center h-full">
-        <Spinner
-          aria-label={`Loading ${title}`}
-          size="xl"
-          className="animate-spin"
-          color="success"
-        />
-      </div>
+      <LoadingState title={title} />
+    ) : data ? (
+      typeof data === 'string' ? (
+        // Render string data, respecting newlines and basic formatting
+        data.split('\n').map((line, index) => (
+          <p
+            key={index}
+            className={`text-sm text-slate-300 mb-1 ${
+              line.startsWith('- ') || line.startsWith('* ') ? 'ml-4' : ''
+            } ${line.match(/^(\d+\.|[A-Z]\.)\s/) ? 'ml-2' : ''} ${
+              /^\s*$/.test(line) ? 'h-2' : ''
+            }`}
+          >
+            {line.replace(/^(- |\* )/, '')}
+          </p>
+        ))
+      ) : (
+        <pre className="text-xs text-slate-300 whitespace-pre-wrap break-words">
+          {JSON.stringify(data, null, 2)}
+        </pre>
+      )
     ) : (
-      <div className="mt-2 h-full overflow-y-auto pr-2 flex flex-col justify-center items-center">
-        {data ? (
-          <>
-            <div className="flex flex-wrap items-center">
-              <span className="font-semibold text-blue-700">Best Case:</span>
-              <span className="ml-2 text-gray-700">
-                ${data.bestCase?.toFixed(2)}
-              </span>
-            </div>
-            <div className="flex flex-wrap items-center">
-              <span className="font-semibold text-blue-700">Average Case:</span>
-              <span className="ml-2 text-gray-700">
-                ${data.averageCase?.toFixed(2)}
-              </span>
-            </div>
-            <div className="flex flex-wrap">
-              <span className="font-semibold text-blue-700">Worst Case:</span>
-              <span className="ml-2 text-gray-700">
-                ${data.worstCase?.toFixed(2)}
-              </span>
-            </div>
-          </>
-        ) : (
-          <p className="text-sm text-gray-500">No data available</p>
-        )}
-      </div>
+      <NoDataState />
     )}
-  </Card>
+  </BaseAnalysisCard>
 );
 
-const SentimentAnalysisCard = ({ title, data, loading, analysisData }) => (
-  <Card className="w-full mt-4 border border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-300 h-96 bg-white">
-    <h5 className="text-lg font-semibold mb-1 text-blue-800">{title}</h5>
-    {!analysisData && loading ? (
-      <div className="flex justify-center items-center h-full">
-        <Spinner
-          aria-label={`Loading ${title}`}
-          size="xl"
-          className="animate-spin"
-          color="success"
-        />
+export const DCFAnalysisCard = ({ title, data, loading }) => (
+  <BaseAnalysisCard title={title} icon={<HiCurrencyDollar />}>
+    {loading ? (
+      <LoadingState title={title} />
+    ) : data ? (
+      <div className="space-y-4 text-slate-300 text-base flex flex-col justify-center h-full items-center">
+        <div className="text-center p-3 rounded-md bg-green-500/10 border border-green-500/30 w-full max-w-xs">
+          <p className="text-xs text-green-300">Best Case</p>
+          <p className="text-2xl font-bold text-green-400">
+            ${data.bestCase?.toFixed(2)}
+          </p>
+        </div>
+        <div className="text-center p-3 rounded-md bg-yellow-500/10 border border-yellow-500/30 w-full max-w-xs">
+          <p className="text-xs text-yellow-300">Average Case</p>
+          <p className="text-2xl font-bold text-yellow-400">
+            ${data.averageCase?.toFixed(2)}
+          </p>
+        </div>
+        <div className="text-center p-3 rounded-md bg-red-500/10 border border-red-500/30 w-full max-w-xs">
+          <p className="text-xs text-red-300">Worst Case</p>
+          <p className="text-2xl font-bold text-red-400">
+            ${data.worstCase?.toFixed(2)}
+          </p>
+        </div>
+        {data.currentPrice !== undefined && (
+          <p className="mt-2 pt-3 border-t border-slate-700 text-sm text-slate-400 w-full max-w-xs text-center">
+            Current Price:{' '}
+            <span className="font-semibold text-slate-200">
+              ${data.currentPrice?.toFixed(2)}
+            </span>
+          </p>
+        )}
       </div>
     ) : (
-      <div className="mt-2 h-full overflow-y-auto pr-2">
-        {data ? (
-          <>
-            <div className="flex flex-wrap mb-1 items-center">
-              <span className="font-semibold text-blue-700">
-                Overall Sentiment:
-              </span>
-              <span className="ml-2 text-gray-700">
-                {data.overallSentiment}
-              </span>
-            </div>
-            <div className="flex flex-wrap mb-1">
-              <span className="font-semibold text-blue-700">
-                Positive Articles:
-              </span>
-              <span className="ml-2 text-gray-700">
+      <NoDataState />
+    )}
+  </BaseAnalysisCard>
+);
+
+export const SentimentAnalysisCard = ({ title, data, loading }) => (
+  <BaseAnalysisCard title={title} icon={<HiUserGroup />}>
+    {loading ? (
+      <LoadingState title={title} />
+    ) : data && data.overallSentiment ? (
+      <div className="space-y-3 text-slate-300">
+        <div className="flex items-center mb-3">
+          <span className="font-semibold text-sm mr-2">Overall Sentiment:</span>
+          <span
+            className={`px-3 py-1 rounded-full text-xs font-bold
+            ${
+              data.overallSentiment === 'positive'
+                ? 'bg-green-400/80 text-green-900 shadow-md shadow-green-500/30'
+                : data.overallSentiment === 'negative'
+                ? 'bg-red-400/80 text-red-900 shadow-md shadow-red-500/30'
+                : 'bg-yellow-400/80 text-yellow-900 shadow-md shadow-yellow-500/30'
+            }`}
+          >
+            {data.overallSentiment.toUpperCase()}
+          </span>
+        </div>
+        {data.sentimentBreakdown && (
+          <div className="text-sm space-y-1">
+            <p>
+              Positive Articles:{' '}
+              <span className="font-semibold text-green-400">
                 {data.sentimentBreakdown.positive}
               </span>
-            </div>
-            <div className="flex flex-wrap mb-1">
-              <span className="font-semibold text-blue-700">
-                Neutral Articles:
-              </span>
-              <span className="ml-2 text-gray-700">
-                {data.sentimentBreakdown.neutral}
-              </span>
-            </div>
-            <div className="flex flex-wrap mb-1">
-              <span className="font-semibold text-blue-700">
-                Negative Articles:
-              </span>
-              <span className="ml-2 text-gray-700">
+            </p>
+            <p>
+              Negative Articles:{' '}
+              <span className="font-semibold text-red-400">
                 {data.sentimentBreakdown.negative}
               </span>
-            </div>
-            <h6 className="text-md font-semibold mt-4 mb-2 text-blue-700">
-              Articles Summary:
+            </p>
+            <p>
+              Neutral Articles:{' '}
+              <span className="font-semibold text-yellow-400">
+                {data.sentimentBreakdown.neutral}
+              </span>
+            </p>
+          </div>
+        )}
+        {data.articles && data.articles.length > 0 && (
+          <>
+            <h6 className="text-sm font-semibold mt-4 pt-3 mb-2 text-sky-400 border-t border-slate-700">
+              Key Articles:
             </h6>
-            <div className="overflow-y-auto w-full max-h-40 pr-1">
-              {data.articles.map((article, index) => (
-                <div key={index} className="mb-3 border-b pb-2 border-gray-200">
-                  <p className="text-sm font-semibold text-gray-800">
+            <div className="space-y-3 max-h-48 pr-1">
+              {' '}
+              {data.articles.slice(0, 3).map((article, index) => (
+                <div
+                  key={index}
+                  className="pb-2 border-b border-slate-700/50 last:border-b-0"
+                >
+                  <p
+                    className="text-xs font-medium text-slate-200 truncate"
+                    title={article.title}
+                  >
                     {article.title}
                   </p>
-                  <p className="text-xs text-gray-600">
-                    Source: {article.source} | Author: {article.author}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    <span className="italic">{article.source}</span> |{' '}
                     {article.sentiment}
                   </p>
                 </div>
               ))}
             </div>
           </>
-        ) : (
-          <p className="text-sm text-gray-500">No data available</p>
         )}
-      </div>
-    )}
-  </Card>
-);
-
-const ComprehensiveAnalysisCard = ({ title, data, loading }) => (
-  <Card className="w-full mt-4 border border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-300 h-96 bg-white">
-    <h5 className="text-lg font-semibold mb-1 text-blue-800">{title}</h5>
-    {loading ? (
-      <div className="flex justify-center items-center h-full">
-        <Spinner
-          aria-label={`Loading ${title}`}
-          size="xl"
-          className="animate-spin"
-          color="success"
-        />
       </div>
     ) : (
-      <div className="h-full overflow-y-auto pr-2">
-        {data ? (
-          Object.entries(data).map(([key, value]) => (
-            <div key={key} className="mb-4">
-              <h6 className="text-md font-semibold text-blue-700 capitalize mb-1">
-                {key.replace(/([A-Z])/g, ' $1')}
-              </h6>
-              <p className="text-sm text-gray-700">{value}</p>
-            </div>
-          ))
-        ) : (
-          <p className="text-sm text-gray-500">No data available</p>
-        )}
-      </div>
+      <NoDataState />
     )}
-  </Card>
+  </BaseAnalysisCard>
 );
 
-export {
-  AnalysisCard,
-  DCFAnalysisCard,
-  SentimentAnalysisCard,
-  ComprehensiveAnalysisCard,
-};
+export const ComprehensiveAnalysisCard = ({ title, data, loading }) => (
+  <BaseAnalysisCard title={title} icon={<HiAcademicCap />}>
+    {loading ? (
+      <LoadingState title={title} />
+    ) : data ? (
+      typeof data === 'object' && !Array.isArray(data) && data !== null ? (
+        Object.entries(data).map(([key, value]) => (
+          <div key={key} className="mb-3">
+            <h4 className="text-sm font-semibold text-sky-400 capitalize mb-0.5">
+              {key.replace(/([A-Z])/g, ' $1').trim()}
+            </h4>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              {String(value)}
+            </p>
+          </div>
+        ))
+      ) : typeof data === 'string' ? (
+        <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">
+          {data}
+        </p>
+      ) : (
+        <NoDataState />
+      )
+    ) : (
+      <NoDataState />
+    )}
+  </BaseAnalysisCard>
+);

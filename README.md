@@ -40,8 +40,12 @@
     - _(Note: General API response caching with Redis is a potential future enhancement.)_
 
 7.  **LangChain Integration & Autonomous Agent**
+
     - Leverages LangChain.js for LLM interaction, prompt management, document processing, vector store operations, and agent creation.
     - Features an **Autonomous "Quick Stock Snapshot" Agent** that can understand user requests, utilize multiple tools to fetch real-time data (price, news sentiment, technical analysis), and synthesize a concise summary.
+
+8.  **Websockets for Real Time Ticker updates**
+    - Uses websockets to connect to FinnHub API to stream real time price updates for given ticker
 
 ## LangChain Integration: Enhancing AI Workflows
 

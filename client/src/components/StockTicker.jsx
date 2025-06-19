@@ -1,4 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Spinner, Card } from 'flowbite-react';
+import {
+  HiOutlineClock,
+  HiOutlineStatusOnline,
+  HiOutlineStatusOffline,
+  HiOutlineTrendingUp,
+  HiOutlineTrendingDown,
+  HiExclamationCircle,
+} from 'react-icons/hi';
 
 const getWsBaseUrl = () => {
   if (process.env.NODE_ENV === 'development') {
@@ -13,91 +22,66 @@ const WS_BASE_URL = getWsBaseUrl();
 
 const StockTicker = ({ activeTicker, displayTicker }) => {
   const [price, setPrice] = useState(null);
+  const [prevPrice, setPrevPrice] = useState(null);
   const [timestamp, setTimestamp] = useState(null);
   const [marketStatus, setMarketStatus] = useState('Checking...');
   const [connectionStatus, setConnectionStatus] = useState('Idle');
-  const [isConnected, setIsConnected] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
 
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
 
   useEffect(() => {
-    // Only attempt to connect if activeTicker is a valid, non-empty string
     if (
       !activeTicker ||
       typeof activeTicker !== 'string' ||
       activeTicker.trim() === ''
     ) {
       setConnectionStatus(
-        activeTicker === null
-          ? 'Awaiting analysis...'
-          : 'No active ticker for stream.'
+        activeTicker === null ? 'Awaiting analysis...' : 'No active ticker.'
       );
-      // Cleanup any existing WebSocket connection if activeTicker becomes invalid/null
       if (wsRef.current) {
-        console.log(
-          `[WS ${
-            displayTicker || 'Ticker'
-          }] Active ticker is now null/invalid. Closing WebSocket.`
-        );
-        wsRef.current.onclose = null; // Prevent reconnect attempts during manual close
-        wsRef.current.close(1000, 'Active ticker removed or invalid');
+        wsRef.current.onclose = null;
+        wsRef.current.close(1000, 'Active ticker removed');
         wsRef.current = null;
       }
-      if (reconnectTimeoutRef.current) {
+      if (reconnectTimeoutRef.current)
         clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
-      setPrice(null); // Clear price data
+      setPrice(null);
+      setPrevPrice(null);
       setTimestamp(null);
-      return; // Exit effect early
+      setIsConnected(false);
+      return;
     }
 
-    // If here, activeTicker is valid, proceed with connection logic
     const connectWebSocket = () => {
-      if (reconnectTimeoutRef.current) {
+      if (reconnectTimeoutRef.current)
         clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
-
-      // Avoid reconnecting if already connected or connecting for the same activeTicker
       if (
         wsRef.current &&
         (wsRef.current.readyState === WebSocket.OPEN ||
           wsRef.current.readyState === WebSocket.CONNECTING) &&
         wsRef.current.subscribedTicker === activeTicker.toUpperCase()
       ) {
-        console.log(
-          `[WS ${activeTicker}] Already connected/connecting for this ticker.`
-        );
         return;
       }
-
-      // If there's an existing ws connection (possibly for a different ticker), close it first.
       if (wsRef.current) {
-        console.log(
-          `[WS ${wsRef.current.subscribedTicker}] Closing previous WebSocket before connecting to ${activeTicker}.`
-        );
-        wsRef.current.onclose = null; // Prevent its onclose from triggering a reconnect for the old ticker
+        wsRef.current.onclose = null;
         wsRef.current.close(1000, `Switching ticker to ${activeTicker}`);
         wsRef.current = null;
       }
 
-      console.log(
-        `[WS ${activeTicker}] Attempting to connect to ${WS_BASE_URL}`
-      );
-      setPrice(null); // Reset price on new connection attempt
+      setPrice(null);
+      setPrevPrice(null);
       setTimestamp(null);
       setConnectionStatus(`Connecting to ${activeTicker}...`);
-
       const socket = new WebSocket(WS_BASE_URL);
       wsRef.current = socket;
-      wsRef.current.subscribedTicker = null; // Initialize what this socket instance is for
+      wsRef.current.subscribedTicker = null;
 
       socket.onopen = () => {
-        console.log(`[WS ${activeTicker}] Connected to WebSocket server.`);
-        setIsConnected(true); // Keep your isConnected state if other UI depends on it
-        setConnectionStatus(`Connected. Subscribing to ${activeTicker}...`);
+        setIsConnected(true);
+        setConnectionStatus(`Subscribing to ${activeTicker}...`);
         socket.send(
           JSON.stringify({
             type: 'subscribe',
@@ -105,37 +89,33 @@ const StockTicker = ({ activeTicker, displayTicker }) => {
           })
         );
         if (wsRef.current)
-          wsRef.current.subscribedTicker = activeTicker.toUpperCase(); // Mark as subscribed
+          wsRef.current.subscribedTicker = activeTicker.toUpperCase();
       };
 
       socket.onmessage = (event) => {
         try {
           const parsedData = JSON.parse(event.data);
-          // Only update if the message is for the currently active ticker
           if (
             parsedData.type === 'trade_update' &&
             parsedData.ticker === activeTicker.toUpperCase()
           ) {
-            if (parsedData.price !== undefined && parsedData.timestamp) {
+            if (parsedData.price !== undefined) {
+              setPrevPrice(price); // Store current price as previous
               setPrice(parsedData.price);
-              setTimestamp(new Date(parsedData.timestamp).toLocaleTimeString());
-              // setMarketStatus('Open'); // Market status should ideally come from a different source or be more robust
-            } else {
-              console.error(
-                `[WS ${activeTicker}] Invalid trade_update data:`,
-                parsedData
+              setTimestamp(
+                new Date(parsedData.timestamp).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                })
               );
             }
           } else if (
             parsedData.type === 'status' &&
             parsedData.ticker === activeTicker.toUpperCase()
           ) {
-            // console.log(`[WS ${activeTicker}] Status from server: ${parsedData.message}`);
             setConnectionStatus(parsedData.message);
           } else if (parsedData.type === 'error') {
-            console.error(
-              `[WS ${activeTicker}] Error from server: ${parsedData.message}`
-            );
             setConnectionStatus(`Server error: ${parsedData.message}`);
           }
         } catch (err) {
@@ -148,148 +128,158 @@ const StockTicker = ({ activeTicker, displayTicker }) => {
       };
 
       socket.onerror = (err) => {
-        console.error(
-          `[WS ${activeTicker}] WebSocket error:`,
-          err.message || 'Unknown WebSocket error'
-        );
-        // Don't set isConnected to false here directly, onclose will handle it.
-        // ws.close() is often implicitly called or will be handled by onclose.
-        setConnectionStatus(`Connection error for ${activeTicker}.`);
+        setConnectionStatus(`Connection error.`);
       };
 
       socket.onclose = (event) => {
-        console.log(
-          `[WS ${activeTicker}] WebSocket disconnected. Clean: ${event.wasClean}, Code: ${event.code}`
-        );
         setIsConnected(false);
-        // Only attempt to reconnect if this socket instance (wsRef.current) was the one that closed
-        // and the closure was not intentional (e.g., component unmount, ticker change).
         if (wsRef.current === socket && !event.wasClean) {
-          setConnectionStatus(
-            `Disconnected. Reconnecting ${activeTicker} in 5s...`
-          );
+          setConnectionStatus(`Reconnecting ${activeTicker}...`);
           reconnectTimeoutRef.current = setTimeout(connectWebSocket, 5000);
         } else if (wsRef.current === socket && event.wasClean) {
-          setConnectionStatus(`Disconnected from ${activeTicker}.`);
+          setConnectionStatus(`Disconnected.`);
         }
-        // If wsRef.current is null or different, it means cleanup/new connection handled it.
       };
     };
 
     connectWebSocket();
 
-    // Market status check (this is independent of the WebSocket connection itself)
     const checkMarketStatus = () => {
-      const now = new Date();
-      const day = now.getDay();
-      // Using ET for market hours more reliably
       const localTime = new Date();
       const etTime = new Date(
         localTime.toLocaleString('en-US', { timeZone: 'America/New_York' })
       );
+      const dayET = etTime.getDay();
       const hourET = etTime.getHours();
       const minuteET = etTime.getMinutes();
       const marketOpenHourET = 9;
       const marketOpenMinuteET = 30;
       const marketCloseHourET = 16;
-      const isWeekday = day >= 1 && day <= 5; // Monday to Friday
+      const isWeekday = dayET >= 1 && dayET <= 5;
       const isMarketHours =
         isWeekday &&
         (hourET > marketOpenHourET ||
           (hourET === marketOpenHourET && minuteET >= marketOpenMinuteET)) &&
         hourET < marketCloseHourET;
-      setMarketStatus(isMarketHours ? 'Open' : 'Closed');
+      setMarketStatus(isMarketHours ? 'Market Open' : 'Market Closed');
     };
     checkMarketStatus();
     const marketStatusIntervalId = setInterval(checkMarketStatus, 60000);
 
-    // Cleanup function: This is critical
     return () => {
-      console.log(
-        `[WS ${activeTicker || displayTicker}] Cleaning up WebSocket effect.`
-      );
       clearInterval(marketStatusIntervalId);
-      if (reconnectTimeoutRef.current) {
+      if (reconnectTimeoutRef.current)
         clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
       if (wsRef.current) {
-        console.log(
-          `[WS ${
-            activeTicker || displayTicker
-          }] Closing WebSocket connection during cleanup.`
-        );
         wsRef.current.onopen = null;
         wsRef.current.onmessage = null;
         wsRef.current.onerror = null;
-        wsRef.current.onclose = null; // Crucial: prevent onclose from triggering reconnect after cleanup
-        wsRef.current.close(
-          1000,
-          'Component unmounting or activeTicker changed'
-        );
+        wsRef.current.onclose = null;
+        wsRef.current.close(1000, 'Component cleanup');
         wsRef.current = null;
       }
-      setIsConnected(false); // Reset connection status on cleanup
-      // setConnectionStatus('Idle'); // Or a suitable status
+      setIsConnected(false);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTicker]); // Effect depends ONLY on activeTicker
+  }, [activeTicker, price]); // Added 'price' to deps for prevPrice update
 
-  // Determine what to display based on activeTicker and connection state
-  const showPrice = price !== null && marketStatus === 'Open' && activeTicker;
-  let statusMessage = 'Enter ticker & click "Get Analysis".';
-  if (activeTicker) {
-    statusMessage = connectionStatus;
+  let priceChangeIndicator = null;
+  if (price !== null && prevPrice !== null) {
+    if (price > prevPrice)
+      priceChangeIndicator = (
+        <HiOutlineTrendingUp className="h-5 w-5 text-green-400 ml-1 animate-pulse" />
+      );
+    else if (price < prevPrice)
+      priceChangeIndicator = (
+        <HiOutlineTrendingDown className="h-5 w-5 text-red-400 ml-1 animate-pulse" />
+      );
   }
-  if (marketStatus === 'Closed' && activeTicker) {
-    statusMessage = `Market is closed. ${connectionStatus}`;
-  }
+
+  let statusIcon = <Spinner size="xs" className="mr-1" />;
+  if (!activeTicker)
+    statusIcon = (
+      <HiExclamationCircle className="h-4 w-4 text-slate-500 mr-1" />
+    );
+  else if (isConnected)
+    statusIcon = (
+      <HiOutlineStatusOnline className="h-4 w-4 text-green-400 mr-1 animate-ping" />
+    );
+  else if (
+    connectionStatus.toLowerCase().includes('error') ||
+    connectionStatus.toLowerCase().includes('failed')
+  )
+    statusIcon = <HiExclamationCircle className="h-4 w-4 text-red-400 mr-1" />;
+  else if (
+    !isConnected &&
+    connectionStatus.toLowerCase().includes('reconnecting')
+  )
+    statusIcon = <Spinner size="xs" className="mr-1 text-yellow-400" />;
+  else if (!isConnected)
+    statusIcon = (
+      <HiOutlineStatusOffline className="h-4 w-4 text-slate-500 mr-1" />
+    );
 
   return (
-    <div className="flex flex-col items-center justify-center p-4 bg-white shadow-lg rounded-lg border border-gray-300 min-w-[250px] max-w-[250px]">
-      <h2
-        className="text-2xl font-bold text-gray-800 mb-1 truncate"
-        title={displayTicker || '---'}
-      >
-        {displayTicker || '---'}
-      </h2>
-      <p
-        className={`text-sm ${
-          marketStatus === 'Open' ? 'text-green-500' : 'text-red-500'
-        } mb-1`}
-      >
-        Market: {marketStatus}
-      </p>
-      <p
-        className="text-xs text-gray-500 mb-2 truncate w-full text-center"
-        title={statusMessage}
-      >
-        {statusMessage}
-      </p>
-      {showPrice ? (
-        <div className="text-center">
-          <p className="text-green-500 text-4xl font-semibold mb-2">
-            ${price?.toFixed(2)}
-          </p>
-          <p className="text-sm text-gray-500">Last: {timestamp}</p>
+    <Card className="bg-slate-800/70 border-slate-700 shadow-xl rounded-lg min-w-[280px] max-w-[320px] p-4 transform hover:scale-105 transition-transform duration-300">
+      <div className="flex items-center justify-between mb-2">
+        <h2
+          className="text-2xl font-bold text-sky-300 truncate"
+          title={displayTicker || 'TICKER'}
+        >
+          {displayTicker || 'TICKER'}
+        </h2>
+        <span
+          className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+            marketStatus === 'Market Open'
+              ? 'bg-green-500/30 text-green-300'
+              : 'bg-red-500/30 text-red-300'
+          }`}
+        >
+          {marketStatus}
+        </span>
+      </div>
+
+      <div className="text-center my-3 min-h-[60px]">
+        {price !== null && activeTicker ? (
+          <div className="flex items-center justify-center">
+            <p
+              className={`text-5xl font-mono font-semibold ${
+                priceChangeIndicator && price > prevPrice
+                  ? 'text-green-400'
+                  : priceChangeIndicator && price < prevPrice
+                  ? 'text-red-400'
+                  : 'text-slate-100'
+              }`}
+            >
+              ${price?.toFixed(2)}
+            </p>
+            {priceChangeIndicator}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center text-slate-400 text-lg h-full">
+            {activeTicker && isConnected ? (
+              <Spinner size="md" />
+            ) : activeTicker ? (
+              'Awaiting Data...'
+            ) : (
+              'No Ticker'
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="text-xs text-slate-400 flex items-center justify-between pt-1 border-t border-slate-700">
+        <div className="flex items-center" title={connectionStatus}>
+          {statusIcon}
+          <span>{activeTicker ? connectionStatus : 'Idle'}</span>
         </div>
-      ) : (
-        <p className="text-gray-500 text-sm h-[40px] flex items-center justify-center text-center">
-          {activeTicker && marketStatus === 'Open' && isConnected
-            ? 'Loading price...'
-            : activeTicker &&
-              marketStatus === 'Open' &&
-              !isConnected &&
-              connectionStatus.toLowerCase().includes('reconnecting')
-            ? 'Reconnecting...'
-            : activeTicker && marketStatus === 'Closed'
-            ? 'Market Closed'
-            : !activeTicker
-            ? 'No active ticker.'
-            : 'Awaiting data...'}
-        </p>
-      )}
-    </div>
+        {timestamp && activeTicker && (
+          <div className="flex items-center">
+            <HiOutlineClock className="h-3 w-3 mr-1" />
+            <span>{timestamp}</span>
+          </div>
+        )}
+      </div>
+    </Card>
   );
 };
 
