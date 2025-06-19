@@ -8,13 +8,14 @@ Deep Value is a full-stack stock analysis application leveraging AI for intrinsi
 
 ## Core Technologies & Architecture
 
-- **Backend:** Node.js, Express.js, WebSockets (for real-time data & client updates)
-- **Frontend:** React (details of UI components can be inferred or added if desired)
+- **Backend:** Node.js, Express.js, WebSockets (ticker price), Server Sent Events (stream LLM responses as they become available)
+- **Frontend:** React (CRA), Tailwind CSS, Flowbite UI components
 - **Data Retrieval:**
   - Financials & Quotes: Yahoo Finance, FinancialModelingPrep
   - Real-time Trades: Finnhub (via WebSockets)
   - News: External News APIs
   - Insider Transactions: External Financial Data APIs
+  - Earnings transcripts: Scrapes latest earnings reports from Fool.com (only NASDAQ tickers supported)
 - **AI & LLM Integration:**
   - OpenAI (GPT-3.5-turbo or similar) for explanations, sentiment analysis, and agent reasoning.
   - LangChain.js for orchestrating LLM interactions, RAG, and agent functionalities.
@@ -22,13 +23,13 @@ Deep Value is a full-stack stock analysis application leveraging AI for intrinsi
   - Pinecone: Vector database for storing embeddings from news and earnings transcripts (for RAG & semantic search).
   - Redis & BullMQ: Message queue for asynchronous processing of embedding storage, enhancing API responsiveness.
 - **Key Services:**
-  - Stock data aggregation and DCF calculation.
-  - Sentiment analysis module for news.
+  - Stock data aggregation and DCF (discounted cash flow) calculation.
+  - Sentiment analysis module for news
   - Insider Transactions analysis
   - Option Chain analysis
   - Technical Analysis
-  - Earnings transcript processing and RAG Q&A.
-  - Autonomous "Quick Stock Snapshot" agent.
+  - Earnings transcript processing and RAG Q&A
+  - Autonomous "Quick Stock Snapshot" agent
 
 ## Key Features
 
@@ -43,7 +44,7 @@ Deep Value is a full-stack stock analysis application leveraging AI for intrinsi
     - A LangChain-powered agent that understands user requests for a stock summary.
     - Utilizes custom tools to fetch current price, news sentiment, key technical signals, and insider sentiment.
     - Synthesizes this data into a concise snapshot using an LLM.
-6.  **Data-Driven Insights:** Provides AI-generated explanations for technical analysis, options chain data, and insider transactions.
+6.  **Data-Driven Insights:** Provides AI-generated explanations for technical analysis, options chain data, and insider transactions, and a comprehesnive analysis of all stock data.
 7.  **Asynchronous Task Processing:** Uses BullMQ and Redis to offload embedding generation and storage to background workers.
 
 ## LangChain Implementation Highlights
@@ -64,4 +65,5 @@ Basic defenses are implemented for the agent interactions:
 
 - Input sanitization (keyword filtering, length limits) on user queries.
 - System prompt reinforcement, instructing the agent to adhere to its designated role and ignore overriding instructions.
-  _(This is a foundational step; production systems would require more advanced measures.)_
+
+- _(This is a foundational step; production systems would require more advanced measures.)_
