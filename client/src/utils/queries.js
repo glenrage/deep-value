@@ -132,3 +132,32 @@ export const requestQuickSnapshot = async (queryInput, chatHistory) => {
     throw error;
   }
 };
+
+export const fetchRagEarningsResponse = async (ticker, query) => {
+  if (!ticker || !query) {
+    throw new Error('Ticker and query are required for RAG earnings response.');
+  }
+  try {
+    const apiUrl = `${BASE_URL}/api/sentiment/rag?ticker=${encodeURIComponent(
+      ticker.toUpperCase()
+    )}&query=${encodeURIComponent(query.trim())}`;
+
+    const response = await fetch(apiUrl);
+
+    if (!response.ok) {
+      let errorMsg = `RAG API error! Status: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.error || errorData.message || errorMsg;
+      } catch (e) {
+        const textError = await response.text();
+        errorMsg = textError || errorMsg;
+      }
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  } catch (error) {
+    console.error('Error fetching RAG earnings response:', error.message);
+    throw error;
+  }
+};

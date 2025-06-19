@@ -11,9 +11,9 @@ const getStockExplanation = async (dcfResult, stockData) => {
   You are a financial expert providing insights on stock valuation. Please provide an analysis of the following data in simple terms:
   
   1. Discounted Cash Flow (DCF) Analysis:
-     - Best Case Intrinsic Value: ${dcfResult.bestCase}
-     - Average Case Intrinsic Value: ${dcfResult.averageCase}
-     - Worst Case Intrinsic Value: ${dcfResult.worstCase}
+     - Best Case Intrinsic Value: ${dcfResult.bestCase.toFixed(2)}
+     - Average Case Intrinsic Value: ${dcfResult.averageCase.toFixed(2)}
+     - Worst Case Intrinsic Value: ${dcfResult.worstCase.toFixed(2)}
      - Current Market Price: ${stockData.currentPrice}
   
   2. Key Financial Metrics:
