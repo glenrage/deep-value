@@ -332,8 +332,6 @@ export function shutdownWebSockets(signal) {
     clearTimeout(finnhubReconnectTimeoutId);
     finnhubReconnectTimeoutId = null;
   }
-  let finnhubClosed = !finnhubWs;
-  let clientsClosed = !clientWssInstance;
 
   const p1 = new Promise((resolve) => {
     if (
