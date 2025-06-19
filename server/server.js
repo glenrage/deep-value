@@ -1,21 +1,21 @@
-import express from 'express';
-import dotenv from 'dotenv';
-import cors from 'cors';
-import http from 'http';
+const express = require('express');
+const dotenv = require('dotenv');
+const cors = require('cors');
+const http = require('http');
 
 dotenv.config();
 
-import { initializePinecone } from './services/pineCone.js';
-import stockRoutes from './routes/stockRoutes.js';
-import aiRoutes from './routes/aiRoutes.js';
-import sentimentRoutes from './routes/sentimentRoutes.js';
-import agentRoutes from './routes/agentRoutes.js';
+const { initializePinecone } = require('./services/pineCone.js');
+const stockRoutes = require('./routes/stockRoutes.js');
+const aiRoutes = require('./routes/aiRoutes.js');
+const sentimentRoutes = require('./routes/sentimentRoutes.js');
+const agentRoutes = require('./routes/agentRoutes.js');
 
-import {
+const {
   initializeClientWSS,
   connectToFinnhub,
   shutdownWebSockets,
-} from './services/webSocketManager.js';
+} = require('./services/webSocketManager.js');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
