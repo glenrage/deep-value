@@ -1,4 +1,5 @@
-import WebSocket, { WebSocketServer } from 'ws';
+const WebSocket = require('ws');
+const { WebSocketServer } = require('ws');
 
 let finnhubWs;
 let clientWssInstance;
@@ -88,8 +89,7 @@ function unsubscribeFromFinnhubTicker(ticker) {
 }
 
 // --- Finnhub WebSocket Connection Logic ---
-export function connectToFinnhub() {
-  // Export this to be called from server.js initially
+function connectToFinnhub() {
   if (finnhubReconnectTimeoutId) {
     clearTimeout(finnhubReconnectTimeoutId);
     finnhubReconnectTimeoutId = null;
@@ -269,7 +269,7 @@ function handleClientSubscriptionRequest(requestedTicker, wsClient) {
 }
 
 // --- Client-Facing WebSocket Server Setup (Called ONCE from server.js) ---
-export function initializeClientWSS(httpServer) {
+function initializeClientWSS(httpServer) {
   if (clientWssInstance) {
     console.warn('[ClientWSManager] Server already initialized.');
     return clientWssInstance;
@@ -324,7 +324,7 @@ export function initializeClientWSS(httpServer) {
 }
 
 // --- Graceful Shutdown for WebSockets (Called from server.js) ---
-export function shutdownWebSockets(signal) {
+function shutdownWebSockets(signal) {
   console.log(
     `[WebSocketManager] Shutting down WebSockets due to ${signal}...`
   );
@@ -374,3 +374,9 @@ export function shutdownWebSockets(signal) {
 
   return Promise.all([p1, p2]);
 }
+
+module.exports = {
+  initializeClientWSS,
+  connectToFinnhub,
+  shutdownWebSockets,
+};
