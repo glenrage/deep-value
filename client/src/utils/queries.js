@@ -7,7 +7,7 @@ if (process.env.REACT_APP_NODE_ENV === 'development') {
 } else {
   BASE_URL = process.env.REACT_APP_API_URL;
 }
-console.log({ BASE_URL });
+
 export const fetchFullStockAnalysis = (ticker, onMessage, onError) => {
   let isComplete = false;
 

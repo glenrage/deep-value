@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const WS_BASE_URL =
   process.env.REACT_APP_NODE_ENV === 'development'
@@ -11,42 +11,51 @@ const StockTicker = ({ ticker, stream }) => {
   const [marketStatus, setMarketStatus] = useState('Checking...');
   const [isConnected, setIsConnected] = useState(false);
 
+  const wsRef = useRef(null);
+  const reconnectRef = useRef(null);
+
   useEffect(() => {
-    let ws;
-    let reconnectInterval;
+    if (!ticker) return;
 
     const connectWebSocket = () => {
-      ws = new WebSocket(WS_BASE_URL);
+      const ws = new WebSocket(WS_BASE_URL);
+      wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log('Connected to WebSocket');
+        console.log('[WS] Connected');
         setIsConnected(true);
         ws.send(JSON.stringify({ type: 'subscribe', ticker }));
       };
 
       ws.onmessage = (event) => {
-        const parsedData = JSON.parse(event.data);
-        if (parsedData.type === 'trade_update') {
-          if (parsedData.price && parsedData.timestamp) {
-            setPrice(parsedData.price);
-            setTimestamp(new Date(parsedData.timestamp).toLocaleTimeString());
-            setMarketStatus('Open');
-          } else {
-            console.error('Invalid trade update data:', parsedData);
+        try {
+          const parsedData = JSON.parse(event.data);
+          if (parsedData.type === 'trade_update') {
+            if (parsedData.price && parsedData.timestamp) {
+              setPrice(parsedData.price);
+              setTimestamp(new Date(parsedData.timestamp).toLocaleTimeString());
+              setMarketStatus('Open');
+            }
           }
+        } catch (err) {
+          console.error('[WS] Failed to parse message:', err);
         }
       };
 
       ws.onclose = () => {
-        console.log('Disconnected from WebSocket, attempting to reconnect...');
+        console.log('[WS] Disconnected, will retry...');
         setIsConnected(false);
-        reconnectInterval = setTimeout(connectWebSocket, 5000); // Try reconnecting after 5 seconds
+        reconnectRef.current = setTimeout(connectWebSocket, 5000);
+      };
+
+      ws.onerror = (err) => {
+        console.error('[WS] Error:', err);
+        ws.close(); // Force close so onclose triggers reconnect
       };
     };
 
     connectWebSocket();
 
-    // Check market status
     const checkMarketStatus = () => {
       const now = new Date();
       const day = now.getDay();
@@ -55,20 +64,21 @@ const StockTicker = ({ ticker, stream }) => {
       const isWeekday = day > 0 && day < 6;
       const isMarketHours =
         (hour > 9 || (hour === 9 && minute >= 30)) && hour < 16;
-
       setMarketStatus(isWeekday && isMarketHours ? 'Open' : 'Closed');
     };
 
     checkMarketStatus();
-    const statusInterval = setInterval(checkMarketStatus, 60000); // Check every minute
+    const intervalId = setInterval(checkMarketStatus, 60000);
 
-    // Cleanup: Close WebSocket and clear intervals on unmount
     return () => {
-      if (ws) ws.close();
-      clearInterval(reconnectInterval);
-      clearInterval(statusInterval);
+      if (wsRef.current) {
+        console.log('[WS] Cleaning up WebSocket');
+        wsRef.current.close();
+      }
+      clearInterval(intervalId);
+      clearTimeout(reconnectRef.current);
     };
-  }, [ticker, stream]);
+  }, [ticker]);
 
   return (
     <div className="flex flex-col items-center justify-center p-4 bg-white shadow-lg rounded-lg border border-gray-300">
