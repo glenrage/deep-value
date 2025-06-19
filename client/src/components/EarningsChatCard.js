@@ -18,7 +18,10 @@ const EarningsChatCard = ({ ticker }) => {
     setError(null);
     setResponse(null);
 
-    const backendUrl = process.env.REACT_APP_API_URL;
+    const backendUrl =
+      process.env.REACT_APP_NODE_ENV === 'development'
+        ? process.env.REACT_APP_LOCAL_API_URL
+        : process.env.REACT_APP_API_URL;
     const apiUrl = `${backendUrl}/api/sentiment/rag?ticker=${encodeURIComponent(
       ticker
     )}&query=${encodeURIComponent(query)}`;

@@ -33,7 +33,7 @@ let clients = [];
 let isAuthenticated = false;
 let subscribedTickers = new Set();
 
-function setupWebSockets(server) {
+function setupWebSockets() {
   alpacaWs = new WebSocket('wss://stream.data.alpaca.markets/v2/iex');
 
   alpacaWs.on('open', () => {

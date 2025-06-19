@@ -105,7 +105,7 @@ const StockAnalysis = () => {
         </Button>
       </div>
 
-      <StockTicker ticker={ticker} stream={stream} />
+      {/* <StockTicker ticker={ticker} stream={stream} /> */}
 
       {error && (
         <div className="bg-red-100 text-red-700 p-4 rounded mt-4 w-full text-center">
@@ -124,11 +124,7 @@ const StockAnalysis = () => {
           data={analysisData.aiExplanation.data}
           loading={analysisData.aiExplanation.loading}
         />
-        <ComprehensiveAnalysisCard
-          title="Comprehensive Analysis"
-          data={analysisData.comprehensiveRecommendation.data}
-          loading={analysisData.comprehensiveRecommendation.loading}
-        />
+
         <SentimentAnalysisCard
           analysisData={analysisData}
           title="News & Analyst Sentiment Analysis"
@@ -149,6 +145,12 @@ const StockAnalysis = () => {
           title="Options Chain Analysis"
           data={analysisData.optionsChainAnalysis.data}
           loading={analysisData.optionsChainAnalysis.loading}
+        />
+
+        <ComprehensiveAnalysisCard
+          title="Comprehensive Analysis"
+          data={analysisData.comprehensiveRecommendation.data}
+          loading={analysisData.comprehensiveRecommendation.loading}
         />
 
         <EarningsChatCard ticker={currentTicker} key={currentTicker} />
